@@ -264,13 +264,12 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
                         m_random_generator_alt.SetSeed((uint32_t)jet.userInt("deterministicSeed"));
                     }
                     std::normal_distribution<> d(0, sigma);
+                    smearFactor = 1. + m_nomVar*d(m_random_generator);
                     // calculate smear factor with TRandom3 if there are determinisitc seeds
                     if(jet.hasUserInt("deterministicSeed")) {
                         smearFactor = 1. + m_nomVar*m_random_generator_alt.Gaus(0, sigma);
                     }
-                    else {
-                        smearFactor = 1. + m_nomVar*d(m_random_generator);
-                    }
+                    
                 } else if (m_debug) {
                     std::cout << "Impossible to smear this jet" << std::endl;
                 }
