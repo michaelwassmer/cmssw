@@ -32,6 +32,7 @@
 #include <TFile.h>
 #include <TH1.h>
 #include <TH1F.h>
+#include <TRandom3.h>
 
 #include <memory>
 #include <random>
@@ -125,20 +126,30 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
 
                 std::uint32_t seed = cfg.getParameter<std::uint32_t>("seed");
                 m_random_generator = std::mt19937(seed);
+                m_random_generator_alt = TRandom3();
 
                 bool skipGenMatching = cfg.getParameter<bool>("skipGenMatching");
                 if (! skipGenMatching)
                     m_genJetMatcher = std::make_shared<pat::GenJetMatcher>(cfg, consumesCollector());
 
                 std::int32_t variation = cfg.getParameter<std::int32_t>("variation");
+		m_nomVar=1;
                 if (variation == 0)
                     m_systematic_variation = Variation::NOMINAL;
                 else if (variation == 1)
                     m_systematic_variation = Variation::UP;
                 else if (variation == -1)
                     m_systematic_variation = Variation::DOWN;
+		else if (variation == 101) {
+		  m_systematic_variation = Variation::NOMINAL;
+		  m_nomVar=1;
+		}
+		else if (variation == -101) {
+		  m_systematic_variation = Variation::NOMINAL;
+		  m_nomVar=-1;
+		}
                 else
-                    throw edm::Exception(edm::errors::ConfigFileReadError, "Invalid value for 'variation' parameter. Only -1, 0 or 1 are supported.");
+                    throw edm::Exception(edm::errors::ConfigFileReadError, "Invalid value for 'variation' parameter. Only -1, 0, 1 or 101, -101 are supported.");
             }
 
             produces<JetCollection>();
@@ -192,15 +203,16 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
                     resolution_sf = JME::JetResolutionScaleFactor::get(setup, m_jets_algo);
                 }
             }
-
-            const JetCollection& jets = *jets_collection;
+            
+            // use non-const jetcollection compared to unchanged SmearedJetProducer to be able to add userfloats
+            JetCollection jets = *jets_collection;
 
             if (m_genJetMatcher)
                 m_genJetMatcher->getTokens(event);
 
             std::unique_ptr<JetCollection> smearedJets(new JetCollection());
-
-            for (const auto& jet: jets) {
+            // therefore use non-const iterator over jets in jetcollection
+            for (auto& jet: jets) {
 
                 if ((! m_enabled) || (jet.pt() == 0)) {
                     // Module disabled or invalid p4. Simply copy the input jet.
@@ -208,6 +220,8 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
 
                     continue;
                 }
+                
+                //TRandom3  m_random_generator_alt;
 
                 double jet_resolution = resolution.getResolution({{JME::Binning::JetPt, jet.pt()}, {JME::Binning::JetEta, jet.eta()}, {JME::Binning::Rho, *rho}});
                 double jer_sf = resolution_sf.getScaleFactor({{JME::Binning::JetEta, jet.eta()}}, m_systematic_variation);
@@ -234,7 +248,7 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
                     }
 
                     double dPt = jet.pt() - genJet->pt();
-                    smearFactor = 1 + (jer_sf - 1.) * dPt / jet.pt();
+                    smearFactor = 1 + m_nomVar*(jer_sf - 1.) * dPt / jet.pt();
 
                 } else if (jer_sf > 1) {
                     /*
@@ -245,9 +259,18 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
                     if (m_debug) {
                         std::cout << "gaussian width: " << sigma << std::endl;
                     }
-
+                    // if jet has deterministic seeds then use the Trandom3 geneerator and seed it with the corresponding deterministic seed
+                    if(jet.hasUserInt("deterministicSeed")) {
+                        m_random_generator_alt.SetSeed((uint32_t)jet.userInt("deterministicSeed"));
+                    }
                     std::normal_distribution<> d(0, sigma);
-                    smearFactor = 1. + d(m_random_generator);
+                    // calculate smear factor with TRandom3 if there are determinisitc seeds
+                    if(jet.hasUserInt("deterministicSeed")) {
+                        smearFactor = 1. + m_nomVar*m_random_generator_alt.Gaus(0, sigma);
+                    }
+                    else {
+                        smearFactor = 1. + m_nomVar*d(m_random_generator);
+                    }
                 } else if (m_debug) {
                     std::cout << "Impossible to smear this jet" << std::endl;
                 }
@@ -261,6 +284,19 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
                         std::cout << "The smearing factor (" << smearFactor << ") is either negative or too small. Fixing it to " << newSmearFactor << " to avoid change of direction." << std::endl;
                     }
                     smearFactor = newSmearFactor;
+                }
+                // add JER SFs as user floats to jets to be able to use later
+                switch(m_systematic_variation) {
+                    
+                    case Variation::NOMINAL:
+                        jet.addUserFloat("HelperJER",smearFactor);
+                        break;
+                    case Variation::UP:
+                        jet.addUserFloat("HelperJERup",smearFactor);
+                        break;
+                    case Variation::DOWN:
+                        jet.addUserFloat("HelperJERdown",smearFactor);
+                        break;
                 }
 
                 T smearedJet = jet;
@@ -296,7 +332,10 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
         std::unique_ptr<JME::JetResolutionScaleFactor> m_scale_factor_from_file;
 
         std::mt19937 m_random_generator;
+        TRandom3  m_random_generator_alt;
 
         GreaterByPt<T> jetPtComparator;
+
+	int m_nomVar;
 };
 #endif
