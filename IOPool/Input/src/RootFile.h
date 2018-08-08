@@ -177,7 +177,7 @@ namespace edm {
     int whyNotFastClonable() const {return whyNotFastClonable_;}
     std::array<bool, NumBranchTypes> const& hasNewlyDroppedBranch() const {return hasNewlyDroppedBranch_;}
     bool branchListIndexesUnchanged() const {return branchListIndexesUnchanged_;}
-    bool modifiedIDs() const {return daqProvenanceHelper_.get() != 0;}
+    bool modifiedIDs() const {return daqProvenanceHelper_.get() != nullptr;}
     std::unique_ptr<FileBlock> createFileBlock() const;
     bool setEntryAtItem(RunNumber_t run, LuminosityBlockNumber_t lumi, EventNumber_t event) {
       return (event != 0) ? setEntryAtEvent(run, lumi, event) : (lumi ? setEntryAtLumi(run, lumi) : setEntryAtRun(run));
@@ -202,7 +202,7 @@ namespace edm {
     bool skipEntries(unsigned int& offset) {return eventTree_.skipEntries(offset);}
     bool skipEvents(int& offset);
     bool goToEvent(EventID const& eventID);
-    bool nextEventEntry() {return eventTree_.next();}
+    bool nextEventEntry() {return eventTree_.nextWithCache();}
     IndexIntoFile::EntryType getNextItemType(RunNumber_t& run, LuminosityBlockNumber_t& lumi, EventNumber_t& event);
     std::shared_ptr<BranchIDListHelper const> branchIDListHelper() const {return get_underlying_safe(branchIDListHelper_);}
     std::shared_ptr<BranchIDListHelper>& branchIDListHelper() {return get_underlying_safe(branchIDListHelper_);}

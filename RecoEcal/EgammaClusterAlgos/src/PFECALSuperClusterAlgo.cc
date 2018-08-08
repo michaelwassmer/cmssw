@@ -172,7 +172,7 @@ namespace {
   };
 }
 
-PFECALSuperClusterAlgo::PFECALSuperClusterAlgo() : beamSpot_(0) { }
+PFECALSuperClusterAlgo::PFECALSuperClusterAlgo() : beamSpot_(nullptr) { }
 
 void PFECALSuperClusterAlgo::
 setPFClusterCalibration(const std::shared_ptr<PFEnergyCalibration>& calib) {
@@ -261,7 +261,7 @@ loadAndSortPFClusters(const edm::Event &iEvent) {
         
     // protection for sim clusters
     if( cluster->caloID().detectors() == 0 && 
-	cluster->hitsAndFractions().size() == 0 ) continue;
+	cluster->hitsAndFractions().empty() ) continue;
 
     CalibratedClusterPtr calib_cluster(new CalibratedPFCluster(cluster));
     switch( cluster->layer() ) {
@@ -392,6 +392,21 @@ buildSuperCluster(CalibClusterPtr& seed,
 	<< std::endl;
     }    
   }
+
+  if (not_clustered == clusters.begin()) {
+    if(dropUnseedable_){
+      clusters.erase(clusters.begin());
+      return;
+    }
+    else {
+      throw cms::Exception("PFECALSuperClusterAlgo::buildSuperCluster")
+        << "Cluster is not seedable!" << std::endl 
+        << "\tNon-Clustered cluster: e = " << (*not_clustered)->energy_nocalib()
+        << " eta = " << (*not_clustered)->eta() << " phi = " << (*not_clustered)->phi()
+        << std::endl;
+    }
+  }
+
   // move the clustered clusters out of available cluster list
   // and into a temporary vector for building the SC  
   CalibratedClusterPtrVector clustered(clusters.begin(),not_clustered);
@@ -516,9 +531,9 @@ buildSuperCluster(CalibClusterPtr& seed,
       for( auto i_ps = clustops.first; i_ps != clustops.second; ++i_ps) {
 	edm::Ptr<reco::PFCluster> psclus(i_ps->second);
 #ifdef EDM_ML_DEBUG
-	auto found_pscluster = std::find(new_sc.preshowerClustersBegin(),
+	auto found_pscluster = std::find_if(new_sc.preshowerClustersBegin(),
 					 new_sc.preshowerClustersEnd(),
-					 i_ps->second);
+					 [&i_ps](const auto& i) { return i.key() == i_ps->first;});
 	if( found_pscluster == new_sc.preshowerClustersEnd() ) {
 #endif	  
 	  new_sc.addPreshowerCluster(psclus);	  	  

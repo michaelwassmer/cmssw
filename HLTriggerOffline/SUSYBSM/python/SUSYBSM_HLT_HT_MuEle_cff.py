@@ -1,7 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
-SUSY_HLT_HT_MuEle = cms.EDAnalyzer("SUSY_HLT_MuEle_Hadronic",
+from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+SUSY_HLT_HT_MuEle = DQMEDAnalyzer('SUSY_HLT_MuEle_Hadronic',
   trigSummary = cms.InputTag("hltTriggerSummaryAOD",'', 'HLT'), #to use with test sample
   #trigSummary = cms.InputTag("hltTriggerSummaryAOD"),
   MuonCollection = cms.InputTag("muons"),
@@ -19,7 +20,7 @@ SUSY_HLT_HT_MuEle = cms.EDAnalyzer("SUSY_HLT_MuEle_Hadronic",
   EtaThrJet = cms.untracked.double(3.0)
 )
 
-SUSY_HLT_HT250_MuEle = cms.EDAnalyzer("SUSY_HLT_MuEle_Hadronic",
+SUSY_HLT_HT250_MuEle = DQMEDAnalyzer('SUSY_HLT_MuEle_Hadronic',
   trigSummary = cms.InputTag("hltTriggerSummaryAOD",'', 'HLT'), #to use with test sample
   #trigSummary = cms.InputTag("hltTriggerSummaryAOD"),
   MuonCollection = cms.InputTag("muons"),
@@ -38,7 +39,7 @@ SUSY_HLT_HT250_MuEle = cms.EDAnalyzer("SUSY_HLT_MuEle_Hadronic",
 )
 
 
-SUSY_HLT_HT_MuEle_POSTPROCESSING = DQMEDHarvester("DQMGenericClient",
+SUSYoHLToHToMuElePOSTPROCESSING = DQMEDHarvester("DQMGenericClient",
     subDirs        = cms.untracked.vstring("HLT/SUSYBSM/HLT_Mu8_Ele8_CaloIdM_TrackIdM_Mass8_PFHT300_v"),
     verbose        = cms.untracked.uint32(2), # Set to 2 for all messages
     resolution     = cms.vstring(""),
@@ -49,7 +50,7 @@ SUSY_HLT_HT_MuEle_POSTPROCESSING = DQMEDHarvester("DQMGenericClient",
     )
 )
 
-SUSY_HLT_HT250_MuEle_POSTPROCESSING = DQMEDHarvester("DQMGenericClient",
+SUSYoHLToHT250oMuElePOSTPROCESSING = DQMEDHarvester("DQMGenericClient",
     subDirs        = cms.untracked.vstring("HLT/SUSYBSM/HLT_Mu8_Ele8_CaloIdM_TrackIdM_Mass8_PFHT250_v"),
     verbose        = cms.untracked.uint32(2), # Set to 2 for all messages
     resolution     = cms.vstring(""),

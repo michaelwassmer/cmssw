@@ -14,13 +14,12 @@ def setupVIDSelection(vidproducer,cutflow):
     if not hasattr(cutflow,'cutFlow'):
         raise Exception('InvalidVIDCutFlow', 'The cutflow configuration provided is malformed and does not have a specific cutflow!')
     cutflow_md5 = central_id_registry.getMD5FromName(cutflow.idName)
-    isPOGApproved = cms.untracked.bool(False)
+    isPOGApproved = False
     if hasattr(cutflow,'isPOGApproved'):
-        isPOGApproved = cutflow.isPOGApproved
-        del cutflow.isPOGApproved
+        isPOGApproved = cutflow.isPOGApproved.value()
     vidproducer.physicsObjectIDs.append(
         cms.PSet( idDefinition = cutflow,
-                  isPOGApproved = isPOGApproved,
+                  isPOGApproved = cms.untracked.bool(isPOGApproved),
                   idMD5 = cms.string(cutflow_md5) )
     )    
 #    sys.stderr.write('Added ID \'%s\' to %s\n'%(cutflow.idName.value(),vidproducer.label()))
@@ -40,7 +39,7 @@ def addVIDSelectionToPATProducer(patProducer,idProducer,idName,addUserData=True)
     setattr(patProducerIDs,idName,cms.InputTag('%s:%s'%(idProducer,idName)))    
     if( addUserData ):
         if( len(userDatas.userClasses.src) == 1 and 
-            type(userDatas.userClasses.src[0]) is str and 
+            isinstance(userDatas.userClasses.src[0], str) and 
             userDatas.userClasses.src[0] == ''            ):
             userDatas.userClasses.src = cms.VInputTag(cms.InputTag('%s:%s'%(idProducer,idName)))        
         else:

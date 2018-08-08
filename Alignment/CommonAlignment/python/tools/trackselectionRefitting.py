@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import FWCore.ParameterSet.Config as cms
 
@@ -12,6 +13,7 @@ def getSequence(process, collection,
                 cosmicsZeroTesla = True,
                 momentumConstraint = None,
                 cosmicTrackSplitting = False,
+                isPVValidation = False,
                 use_d0cut = True):
     """This function returns a cms.Sequence containing as last element the
     module 'FinalTrackRefitter', which can be used as cms.InputTag for
@@ -42,6 +44,8 @@ def getSequence(process, collection,
                             to provide here the name of the constraint module.
     - `cosmicTrackSplitting`: If set to 'True' cosmic tracks are split before the
                               second track refitter.
+    - `isPVValidation`: If set to 'True' most of the selection cuts are overridden
+                        to allow unbiased selection of tracks for vertex refitting 
     - `use_d0cut`: If 'True' (default), apply a cut |d0| < 50.
     """
 
@@ -52,8 +56,8 @@ def getSequence(process, collection,
     if usePixelQualityFlag is None:
         if "Template" not in TTRHBuilder:
             usePixelQualityFlag = False # not defined without templates
-            print "Using 'TTRHBuilder' without templates:", TTRHBuilder
-            print " --> Turning off pixel quality flag in hit filter."
+            print("Using 'TTRHBuilder' without templates:", TTRHBuilder)
+            print(" --> Turning off pixel quality flag in hit filter.")
         else:
             usePixelQualityFlag = True # default for usage with templates
 
@@ -210,6 +214,27 @@ def getSequence(process, collection,
         options["TrackHitFilter"]["Tracker"].update({
                 "minimumHits": 10,
                 })
+    elif collection == "ALCARECOTkAlJpsiMuMu":
+        options["TrackSelector"]["Alignment"].update({
+                "ptMin": 1.0,
+                "etaMin": -2.4,
+                "etaMax": 2.4,
+                "nHitMin": 10,
+                "applyMultiplicityFilter": True,
+                "minMultiplicity": 2,
+                "maxMultiplicity": 2,
+                ("minHitsPerSubDet", "inPIXEL"): 1,
+                ("TwoBodyDecaySelector", "applyChargeFilter"): True,
+                ("TwoBodyDecaySelector", "charge"): 0,
+                ("TwoBodyDecaySelector",
+                 "applyMassrangeFilter"): not openMassWindow,
+                ("TwoBodyDecaySelector", "minXMass"): 2.7,
+                ("TwoBodyDecaySelector", "maxXMass"): 3.4,
+                ("TwoBodyDecaySelector", "daughterMass"): 0.105
+                })
+        options["TrackHitFilter"]["Tracker"].update({
+                "minimumHits": 10,
+                })
     else:
         raise ValueError("Unknown input track collection: {}".format(collection))
 
@@ -251,6 +276,25 @@ def getSequence(process, collection,
                                              "clone": True})]
         if isCosmics: mods = mods[1:] # skip high purity selector for cosmics
 
+    #############################
+    ## PV Validation cuts tune ##                 
+    #############################
+
+    if isPVValidation:
+        options["TrackSelector"]["HighPurity"].update({
+                "trackQualities": [],
+                "pMin": 0.
+                })
+        options["TrackSelector"]["Alignment"].update({
+                "pMin" :      0.,      
+                "ptMin" :     0.,       
+                "nHitMin2D" : 0,       
+                "nHitMin"   : 0,       
+                "d0Min" : -999999.0,
+                "d0Max" :  999999.0,
+                "dzMin" : -999999.0,
+                "dzMax" :  999999.0
+                })
 
     ################################
     ## apply momentum constraint? ##
@@ -258,10 +302,17 @@ def getSequence(process, collection,
 
     if momentumConstraint is not None:
         for mod in options["TrackRefitter"]:
-            options["TrackRefitter"][mod].update({
-                "constraint": "momentum",
-                "srcConstr": momentumConstraint
-                })
+            momconstrspecs = momentumConstraint.split(',')
+            if len(momconstrspecs)==1:
+                options["TrackRefitter"][mod].update({
+                    "constraint": "momentum",
+                    "srcConstr": momconstrspecs[0]
+                    })
+            else:
+                options["TrackRefitter"][mod].update({
+                    "constraint": momconstrspecs[1],
+                    "srcConstr": momconstrspecs[0]
+                    })
 
 
 
@@ -287,7 +338,7 @@ def getSequence(process, collection,
     else:
         if mods[-1][-1]["method"] is "load" and \
                 not mods[-1][-1].get("clone", False):
-            print "Name of the last module needs to be modifiable."
+            print("Name of the last module needs to be modifiable.")
             sys.exit(1)
         src = _getModule(process, src, mods[-1][0], "FinalTrackRefitter",
                          options[mods[-1][0]][mods[-1][1]],
@@ -295,7 +346,31 @@ def getSequence(process, collection,
         modules.append(getattr(process, src))
 
     moduleSum = process.offlineBeamSpot        # first element of the sequence
-    for module in modules: moduleSum += module # append the other modules
+    for module in modules:
+        # Spply srcConstr fix here
+        if hasattr(module,"srcConstr"):
+           strSrcConstr = module.srcConstr.getModuleLabel()
+           if strSrcConstr:
+               procsrcconstr = getattr(process,strSrcConstr)
+               if hasattr(procsrcconstr,"src"): # Momentum or track parameter constraints
+                  if procsrcconstr.src != module.src:
+                     module.srcConstr=''
+                     module.constraint=''
+                  else:
+                     moduleSum += procsrcconstr # Add constraint
+               elif hasattr(procsrcconstr,"srcTrk"): # Vertex constraint
+                  if procsrcconstr.srcTrk != module.src:
+                     module.srcConstr=''
+                     module.constraint=''
+                  else:
+                     procsrcconstrsrcvtx = getattr(process,procsrcconstr.srcVtx.getModuleLabel())
+                     if type(procsrcconstrsrcvtx) is cms.EDFilter: # If source of vertices is itself a filter (e.g. good PVs)
+                        procsrcconstrsrcvtxprefilter = getattr(process,procsrcconstrsrcvtx.src.getModuleLabel())
+                        moduleSum += procsrcconstrsrcvtxprefilter # Add vertex source to constraint before filter
+                     moduleSum += procsrcconstrsrcvtx # Add vertex source to constraint
+                     moduleSum += procsrcconstr # Add constraint
+
+        moduleSum += module # append the other modules
 
     return cms.Sequence(moduleSum)
 
@@ -338,7 +413,7 @@ def _getModule(process, src, modType, moduleName, options, **kwargs):
             obj = getattr(process, objTuple[1])
             moduleName = objTuple[1]
     else:
-        print "Unknown method:", method
+        print("Unknown method:", method)
         sys.exit(1)
 
     if modType == "TrackSplitting":
@@ -426,9 +501,9 @@ def _customSetattr(obj, attr, val):
     - `val`: value of the attribute.
     """
 
-    if type(attr) is tuple and len(attr) > 1:
+    if isinstance(attr, tuple) and len(attr) > 1:
         _customSetattr(getattr(obj, attr[0]), attr[1:], val)
     else:
-        if type(attr) is tuple: attr = attr[0]
+        if isinstance(attr, tuple): attr = attr[0]
         setattr(obj, attr, val)
 

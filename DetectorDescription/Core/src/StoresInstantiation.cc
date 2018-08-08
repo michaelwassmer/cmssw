@@ -11,14 +11,13 @@
 #include "DetectorDescription/Core/src/Material.h"
 #include "DetectorDescription/Core/src/Solid.h"
 #include "DetectorDescription/Core/src/Specific.h"
-#include "DetectorDescription/Core/interface/ClhepEvaluator.h"
+
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
 template class DDI::Singleton<AxesNames>;
-template class DDI::Singleton<ClhepEvaluator>;
 template class DDI::Singleton<DDRoot>;
 template class DDI::Singleton<DDI::Store<DDName, std::vector<std::string>* > >;
 template class DDI::Singleton<DDI::Store<DDName, std::string* > >;

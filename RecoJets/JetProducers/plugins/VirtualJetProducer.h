@@ -15,6 +15,7 @@
 #include "DataFormats/JetReco/interface/BasicJet.h"
 #include "DataFormats/JetReco/interface/GenJet.h"
 #include "DataFormats/PatCandidates/interface/PackedCandidate.h"
+#include "DataFormats/PatCandidates/interface/PackedGenParticle.h"
 
 #include "DataFormats/JetReco/interface/BasicJetCollection.h"
 
@@ -26,6 +27,7 @@
 #include "fastjet/ClusterSequenceArea.hh"
 #include "fastjet/PseudoJet.hh"
 #include "fastjet/GhostedAreaSpec.hh"
+#include "fastjet/Selector.hh"
 
 #include <memory>
 #include <vector>
@@ -79,7 +81,7 @@ protected:
   //
 public:
   explicit VirtualJetProducer(const edm::ParameterSet& iConfig);
-  virtual ~VirtualJetProducer();
+  ~VirtualJetProducer() override;
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
   static void fillDescriptionsFromVirtualJetProducer(edm::ParameterSetDescription& desc);
   
@@ -89,13 +91,13 @@ public:
   typedef boost::shared_ptr<fastjet::JetDefinition>          JetDefPtr;
   typedef boost::shared_ptr<fastjet::GhostedAreaSpec>        ActiveAreaSpecPtr;
   typedef boost::shared_ptr<fastjet::AreaDefinition>         AreaDefinitionPtr;
-  typedef boost::shared_ptr<fastjet::RangeDefinition>        RangeDefPtr;
+  typedef boost::shared_ptr<fastjet::Selector>               SelectorPtr;
   
   //
   // member functions
   //
 public:
-  virtual void  produce(edm::Event& iEvent, const edm::EventSetup& iSetup) override;
+  void  produce(edm::Event& iEvent, const edm::EventSetup& iSetup) override;
   std::string   jetType() const { return jetType_; }
   
 protected:
@@ -149,6 +151,8 @@ protected:
   template< typename T>
   void writeCompoundJets(  edm::Event & iEvent, edm::EventSetup const& iSetup);
 
+  template< typename T>
+    void writeJetsWithConstituents(  edm::Event & iEvent, edm::EventSetup const& iSetup);
 
   // This method copies the constituents from the fjConstituents method
   // to an output of CandidatePtr's. 
@@ -199,7 +203,7 @@ protected:
   PluginPtr                       fjPlugin_;        // fastjet plugin
   ActiveAreaSpecPtr               fjActiveArea_;    // fastjet active area definition
   AreaDefinitionPtr               fjAreaDefinition_;// fastjet area definition
-  RangeDefPtr                     fjRangeDef_;      // range definition
+  SelectorPtr                     fjSelector_;      // selector for range definition
   std::vector<fastjet::PseudoJet> fjInputs_;        // fastjet inputs
   std::vector<fastjet::PseudoJet> fjJets_;          // fastjet jets
 
@@ -210,13 +214,14 @@ protected:
 
   std::string                     jetCollInstanceName_;       // instance name for output jet collection
   bool                            writeCompound_;    // write compound jets (i.e. jets of jets)
+  bool                            writeJetsWithConst_;    // write jets with constituents
   boost::shared_ptr<PileUpSubtractor>  subtractor_;
 
   bool                            useDeterministicSeed_; // If desired, use a deterministic seed to fastjet
   unsigned int                    minSeed_;              // minimum seed to use, useful for MC generation
 
   int                   verbosity_;                 // flag to enable/disable debug output
-  bool                  fromHTTTopJetProducer_;   // for running the v2.0 HEPTopTagger
+  bool                  fromHTTTopJetProducer_ = false;   // for running the v2.0 HEPTopTagger
 
 private:
   std::auto_ptr<AnomalousTower>   anomalousTowerDef_;  // anomalous tower definition
@@ -225,7 +230,9 @@ private:
   edm::EDGetTokenT<reco::CandidateView> input_candidateview_token_;
   edm::EDGetTokenT<std::vector<edm::FwdPtr<reco::PFCandidate> > > input_candidatefwdptr_token_;
   edm::EDGetTokenT<std::vector<edm::FwdPtr<pat::PackedCandidate> > > input_packedcandidatefwdptr_token_;
-
+  edm::EDGetTokenT<std::vector<edm::FwdPtr<reco::GenParticle> > > input_gencandidatefwdptr_token_;
+  edm::EDGetTokenT<std::vector<edm::FwdPtr<pat::PackedGenParticle> > > input_packedgencandidatefwdptr_token_;
+  
  protected:
   edm::EDGetTokenT<reco::VertexCollection> input_vertex_token_;
   

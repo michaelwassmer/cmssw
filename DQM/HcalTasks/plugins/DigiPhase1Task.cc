@@ -82,7 +82,7 @@ DigiPhase1Task::DigiPhase1Task(edm::ParameterSet const& ps):
 	_cOccupancyvsLS_Subdet.initialize(_name, "OccupancyvsLS",
 		hcaldqm::hashfunctions::fSubdet,
 		new hcaldqm::quantity::LumiSection(_maxLS),
-		new hcaldqm::quantity::ValueQuantity(hcaldqm::quantity::fN_to3000),0);
+		new hcaldqm::quantity::ValueQuantity(hcaldqm::quantity::fN_to8000),0);
 	_cOccupancy_depth.initialize(_name, "Occupancy",
 		hcaldqm::hashfunctions::fdepth,
 		new hcaldqm::quantity::DetectorQuantity(hcaldqm::quantity::fieta),
@@ -93,7 +93,7 @@ DigiPhase1Task::DigiPhase1Task(edm::ParameterSet const& ps):
 	_cOccupancyCutvsLS_Subdet.initialize(_name, "OccupancyCutvsLS",
 		hcaldqm::hashfunctions::fSubdet,
 		new hcaldqm::quantity::LumiSection(_maxLS),
-		new hcaldqm::quantity::ValueQuantity(hcaldqm::quantity::fN_to3000),0);
+		new hcaldqm::quantity::ValueQuantity(hcaldqm::quantity::fN_to8000),0);
 	_cOccupancyCut_depth.initialize(_name, "OccupancyCut",
 		hcaldqm::hashfunctions::fdepth,
 		new hcaldqm::quantity::DetectorQuantity(hcaldqm::quantity::fieta),
@@ -333,10 +333,14 @@ DigiPhase1Task::DigiPhase1Task(edm::ParameterSet const& ps):
 		if (rawid==0) 
 		{meUnknownIds1LS->Fill(1); _unknownIdsPresent=true;continue;}
 		HcalElectronicsId const& eid(rawid);
-		if (did.subdet()==HcalBarrel)
+		if (did.subdet()==HcalBarrel) {
 			rawidHBValid = did.rawId();
-		else if (did.subdet()==HcalEndcap) 
+		} else if (did.subdet()==HcalEndcap) {
 			rawidHEValid = did.rawId();
+		} else {
+			// Skip non-HB or HE detids
+			continue;
+		}
 
 		//  filter out channels that are masked out
 		if (_xQuality.exists(did)) 
@@ -556,8 +560,12 @@ DigiPhase1Task::DigiPhase1Task(edm::ParameterSet const& ps):
 		if (rawid==0) 
 		{meUnknownIds1LS->Fill(1); _unknownIdsPresent=true;continue;}
 		HcalElectronicsId const& eid(rawid);
-		if (did.subdet()==HcalForward)
+		if (did.subdet()==HcalForward) {
 			rawidValid = did.rawId();
+		} else {
+			// Skip non-HF detids
+			continue;
+		}
 
 		//  filter out channels that are masked out
 		if (_xQuality.exists(did)) 

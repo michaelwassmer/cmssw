@@ -1,3 +1,4 @@
+from __future__ import print_function
 import FWCore.ParameterSet.Config as cms
 import FWCore.ParameterSet.VarParsing as VarParsing
 
@@ -53,7 +54,7 @@ runType.setRunType(options.runkey.strip())
 
 if not options.inputFiles:
     # Input source
-    nextLumiTimeoutMillis = 90000
+    nextLumiTimeoutMillis = 240000
     endOfRunKills = True
     
     if options.scanOnce:
@@ -74,7 +75,7 @@ if not options.inputFiles:
         endOfRunKills  = cms.untracked.bool(endOfRunKills),
     )
 else:
-    print "The list of input files is provided. Disabling discovery and running on everything."
+    print("The list of input files is provided. Disabling discovery and running on everything.")
     files = map(lambda x: "file://" + x, options.inputFiles)
     source = cms.Source("PoolSource",
         fileNames = cms.untracked.vstring(files),
@@ -88,4 +89,4 @@ else:
 #    secondaryFileNames = cms.untracked.vstring()
 #)
 
-print "Source:", source
+print("Source:", source)

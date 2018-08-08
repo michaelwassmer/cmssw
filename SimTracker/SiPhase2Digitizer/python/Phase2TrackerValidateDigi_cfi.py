@@ -1,6 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 
-digiValid = cms.EDAnalyzer("Phase2TrackerValidateDigi",
+from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+digiValid = DQMEDAnalyzer('Phase2TrackerValidateDigi',
     Verbosity = cms.bool(False),
     TopFolderName = cms.string("Ph2TkPixelDigi"),
     PixelPlotFillingFlag = cms.bool(False),
@@ -25,6 +26,8 @@ digiValid = cms.EDAnalyzer("Phase2TrackerValidateDigi",
     GeometryType = cms.string('idealForDigi'),
     PtCutOff      = cms.double(9.5),                           
     EtaCutOff      = cms.double(3.5),                           
+    TOFLowerCutOff = cms.double(-12.5),
+    TOFUpperCutOff = cms.double(12.5),
     TrackPtH = cms.PSet(
         Nbins  = cms.int32(50),
         xmin   = cms.double(0.0),
@@ -108,4 +111,10 @@ digiValid = cms.EDAnalyzer("Phase2TrackerValidateDigi",
         ymin   = cms.double(0.),
         ymax   = cms.double(50.)
     )
+)
+
+from Configuration.ProcessModifiers.premix_stage2_cff import premix_stage2
+premix_stage2.toModify(digiValid,
+    OuterTrackerDigiSimLinkSource = "mixData:Phase2OTDigiSimLink",
+    InnerPixelDigiSimLinkSource = "mixData:PixelDigiSimLink",
 )

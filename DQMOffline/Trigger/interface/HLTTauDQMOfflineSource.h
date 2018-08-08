@@ -29,7 +29,7 @@
 class HLTTauDQMOfflineSource : public DQMEDAnalyzer {
 public:
     HLTTauDQMOfflineSource( const edm::ParameterSet& );
-    ~HLTTauDQMOfflineSource();
+    ~HLTTauDQMOfflineSource() override;
 
 protected:
     void dqmBeginRun(const edm::Run& r, const edm::EventSetup& c) override;
@@ -58,10 +58,8 @@ private:
       edm::EDGetTokenT<LVColl> token;
     };
     std::vector<RefObject> refObjects_;
-    bool tagAndProbe;
-
-    std::vector<std::unique_ptr<GenericTriggerEventFlag> > num_genTriggerEventFlag_;
-    std::vector<std::unique_ptr<GenericTriggerEventFlag> > den_genTriggerEventFlag_;
+    bool tagAndProbe_;
+    std::vector<edm::ParameterSet> tagAndProbePaths;
 
     //DQM Prescaler
     int counterEvt_;      //counter

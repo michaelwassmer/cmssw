@@ -1,5 +1,7 @@
+from __future__ import print_function
 import FWCore.ParameterSet.Config as cms
 import sys
+import six
 
 ## Helpers to perform some technically boring tasks like looking for all modules with a given parameter
 ## and replacing that to a given value
@@ -35,7 +37,7 @@ def addESProducers(process,config):
 	module = __import__(config)
 	for name in dir(sys.modules[config]):
 		item = getattr(sys.modules[config],name)
-		if isinstance(item,cms._Labelable) and not isinstance(item,cms._ModuleSequenceType) and not name.startswith('_') and not (name == "source" or name == "looper" or name == "subProcess") and not type(item) is cms.PSet:
+		if isinstance(item,cms._Labelable) and not isinstance(item,cms._ModuleSequenceType) and not name.startswith('_') and not (name == "source" or name == "looper" or name == "subProcess") and not isinstance(item, cms.PSet):
 			if 'ESProducer' in item.type_():
 				setattr(process,name,item)
 
@@ -119,15 +121,19 @@ def applyPostfix(process, label, postfix):
     return result
 
 def removeIfInSequence(process, target,  sequenceLabel, postfix=""):
-    labels = __labelsInSequence(process, sequenceLabel, postfix)
+    labels = __labelsInSequence(process, sequenceLabel, postfix, True)
     if target+postfix in labels:
         getattr(process, sequenceLabel+postfix).remove(
             getattr(process, target+postfix)
             )
 
-def __labelsInSequence(process, sequenceLabel, postfix=""):
-    result = [ m.label()[:-len(postfix)] for m in listModules( getattr(process,sequenceLabel+postfix))]
-    result.extend([ m.label()[:-len(postfix)] for m in listSequences( getattr(process,sequenceLabel+postfix))]  )
+def __labelsInSequence(process, sequenceLabel, postfix="", keepPostFix=False):
+    position = -len(postfix)
+    if keepPostFix: 
+        position = None
+
+    result = [ m.label()[:position] for m in listModules( getattr(process,sequenceLabel+postfix))]
+    result.extend([ m.label()[:position] for m in listSequences( getattr(process,sequenceLabel+postfix))]  )
     if postfix == "":
         result = [ m.label() for m in listModules( getattr(process,sequenceLabel+postfix))]
         result.extend([ m.label() for m in listSequences( getattr(process,sequenceLabel+postfix))]  )
@@ -269,7 +275,7 @@ def listDependencyChain(process, module, sources, verbose=False):
     """
     def allDirectInputModules(moduleOrPSet,moduleName,attrName):
         ret = set()
-        for name,value in moduleOrPSet.parameters_().iteritems():
+        for name,value in six.iteritems(moduleOrPSet.parameters_()):
             type = value.pythonTypeName()
             if type == 'cms.PSet':
                 ret.update(allDirectInputModules(value,moduleName,moduleName+"."+name))
@@ -280,11 +286,11 @@ def listDependencyChain(process, module, sources, verbose=False):
                 inputs = [ MassSearchReplaceAnyInputTagVisitor.standardizeInputTagFmt(it) for it in value ]
                 inputLabels = [ tag.moduleLabel for tag in inputs if tag.processName == '' or tag.processName == process.name_() ]
                 ret.update(inputLabels)
-                if verbose and inputLabels: print "%s depends on %s via %s" % (moduleName, inputLabels, attrName+"."+name)
+                if verbose and inputLabels: print("%s depends on %s via %s" % (moduleName, inputLabels, attrName+"."+name))
             elif type.endswith('.InputTag'):
                 if value.processName == '' or value.processName == process.name_():
                     ret.add(value.moduleLabel)
-                    if verbose: print "%s depends on %s via %s" % (moduleName, value.moduleLabel, attrName+"."+name)
+                    if verbose: print("%s depends on %s via %s" % (moduleName, value.moduleLabel, attrName+"."+name))
         ret.discard("")
         return ret
     def fillDirectDepGraphs(root,fwdepgraph,revdepgraph):
@@ -337,7 +343,7 @@ def listDependencyChain(process, module, sources, verbose=False):
         for j,m2 in enumerate(modulelist):
             if j <= i: continue
             if m2 in flatdeps and m1 in flatdeps[m2]:
-                raise RuntimeError, "BAD ORDER %s BEFORE %s" % (m1,m2)
+                raise RuntimeError("BAD ORDER %s BEFORE %s" % (m1,m2))
     modules = [ getattr(process,p) for p in modulelist ]
     #return cms.Sequence(sum(modules[1:],modules[0]))
     task = cms.Task()
@@ -347,13 +353,13 @@ def listDependencyChain(process, module, sources, verbose=False):
 
 def addKeepStatement(process, oldKeep, newKeeps, verbose=False):
     """Add new keep statements to any PoolOutputModule of the process that has the old keep statements"""
-    for name,out in process.outputModules.iteritems():
+    for name,out in six.iteritems(process.outputModules):
         if out.type_() == 'PoolOutputModule' and hasattr(out, "outputCommands"):
             if oldKeep in out.outputCommands:
                 out.outputCommands += newKeeps
             if verbose:
-                print "Adding the following keep statements to output module %s: " % name
-                for k in newKeeps: print "\t'%s'," % k
+                print("Adding the following keep statements to output module %s: " % name)
+                for k in newKeeps: print("\t'%s'," % k)
 
 
 if __name__=="__main__":

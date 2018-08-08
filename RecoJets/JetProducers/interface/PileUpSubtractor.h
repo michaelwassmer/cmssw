@@ -31,8 +31,7 @@ class PileUpSubtractor{
   
   PileUpSubtractor(const edm::ParameterSet& iConfig,  edm::ConsumesCollector && iC); 
   virtual ~PileUpSubtractor(){;}
-  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
-
+  
   virtual void setDefinition(JetDefPtr const & jetDef);
   virtual void reset(std::vector<edm::Ptr<reco::Candidate> >& input,
 	     std::vector<fastjet::PseudoJet>& towers,
@@ -77,8 +76,6 @@ class PileUpSubtractor{
   double                nSigmaPU_;                  // number of sigma for pileup
   double                radiusPU_;                  // pileup radius
   ActiveAreaSpecPtr               fjActiveArea_;    // fastjet active area definition
-  RangeDefPtr                     fjRangeDef_;      // range definition
-
   CaloGeometry const *  geo_;                       // geometry
   int                   ietamax_;                   // maximum eta in geometry
   int                   ietamin_;                   // minimum eta in geometry

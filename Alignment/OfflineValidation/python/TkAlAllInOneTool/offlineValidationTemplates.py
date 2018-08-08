@@ -31,6 +31,7 @@ process.TrackerOfflineValidation.oO[offlineValidationMode]Oo..trajectoryInput = 
 process.TrackerOfflineValidation.oO[offlineValidationMode]Oo..moduleLevelHistsTransient = .oO[offlineModuleLevelHistsTransient]Oo.
 process.TrackerOfflineValidation.oO[offlineValidationMode]Oo..moduleLevelProfiles = .oO[offlineModuleLevelProfiles]Oo.
 process.TrackerOfflineValidation.oO[offlineValidationMode]Oo..stripYResiduals = .oO[stripYResiduals]Oo.
+process.TrackerOfflineValidation.oO[offlineValidationMode]Oo..maxTracks = .oO[maxtracks]Oo./ .oO[parallelJobs]Oo.
 """
 
 OfflineValidationSequence = "process.seqTrackerOfflineValidation.oO[offlineValidationMode]Oo."
@@ -108,5 +109,9 @@ void TkAlExtendedOfflineValidation()
   p.plotDMR(".oO[DMRMethod]Oo.",.oO[DMRMinimum]Oo.,".oO[DMROptions]Oo.");
   p.plotSurfaceShapes(".oO[SurfaceShapes]Oo.");
   p.plotChi2("root://eoscms//eos/cms/store/caf/user/$USER/.oO[eosdir]Oo./.oO[validationId]Oo._result.root");
+  vector<int> moduleids = {.oO[moduleid]Oo.};
+  for (auto moduleid : moduleids) {
+  	p.residual_by_moduleID(moduleid);
+  }
 }
 """

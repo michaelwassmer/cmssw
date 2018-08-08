@@ -1,6 +1,10 @@
+from __future__ import print_function
 import os
+import re
 import ROOT
+import sys
 from TkAlExceptions import AllInOneError
+import six
 
 ####################--- Helpers ---############################
 def replaceByMap(target, the_map):
@@ -21,7 +25,7 @@ def replaceByMap(target, the_map):
                     result = result.replace(".oO["+key+"]Oo.",the_map[key])
                 except TypeError:   #try a dict
                     try:
-                        for keykey, value in the_map[key].iteritems():
+                        for keykey, value in six.iteritems(the_map[key]):
                            result = result.replace(".oO[" + key + "['" + keykey + "']]Oo.", value)
                            result = result.replace(".oO[" + key + '["' + keykey + '"]]Oo.', value)
                     except AttributeError:   #try a list
@@ -150,12 +154,12 @@ def cache(function):
     cache = {}
     def newfunction(*args, **kwargs):
         try:
-            return cache[args, tuple(sorted(kwargs.iteritems()))]
+            return cache[args, tuple(sorted(six.iteritems(kwargs)))]
         except TypeError:
-            print args, tuple(sorted(kwargs.iteritems()))
+            print(args, tuple(sorted(six.iteritems(kwargs))))
             raise
         except KeyError:
-            cache[args, tuple(sorted(kwargs.iteritems()))] = function(*args, **kwargs)
+            cache[args, tuple(sorted(six.iteritems(kwargs)))] = function(*args, **kwargs)
             return newfunction(*args, **kwargs)
     newfunction.__name__ = function.__name__
     return newfunction
@@ -190,3 +194,54 @@ def cppboolstring(string, name):
     and makes it into a bool string for a C++ template
     """
     return pythonboolstring(string, name).lower()
+
+def conddb(*args):
+    """
+    Wrapper for conddb, so that you can run
+    conddb("--db", "myfile.db", "listTags"),
+    like from the command line, without explicitly
+    dealing with all the functions in CondCore/Utilities.
+    getcommandoutput2(conddb ...) doesn't work, it imports
+    the wrong sqlalchemy in CondCore/Utilities/python/conddblib.py
+    """
+    from tempfile import NamedTemporaryFile
+
+    with open(getCommandOutput2("which conddb").strip()) as f:
+        conddb = f.read()
+
+    def sysexit(number):
+        if number != 0:
+            raise AllInOneError("conddb exited with status {}".format(number))
+    namespace = {"sysexit": sysexit, "conddboutput": ""}
+
+    conddb = conddb.replace("sys.exit", "sysexit")
+
+    bkpargv = sys.argv
+    sys.argv[1:] = args
+    bkpstdout = sys.stdout
+    with NamedTemporaryFile(bufsize=0) as sys.stdout:
+        exec(conddb, namespace)
+        namespace["main"]()
+        with open(sys.stdout.name) as f:
+            result = f.read()
+
+    sys.argv[:] = bkpargv
+    sys.stdout = bkpstdout
+
+    return result
+
+
+def clean_name(s):
+    """Transforms a string into a valid variable or method name.
+
+    Arguments:
+    - `s`: input string
+    """
+
+    # Remove invalid characters
+    s = re.sub(r"[^0-9a-zA-Z_]", "", s)
+
+    # Remove leading characters until we find a letter or underscore
+    s = re.sub(r"^[^a-zA-Z_]+", "", s)
+
+    return s

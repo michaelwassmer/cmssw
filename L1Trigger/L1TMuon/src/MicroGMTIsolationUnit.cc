@@ -1,4 +1,4 @@
-#include "../interface/MicroGMTIsolationUnit.h"
+#include "L1Trigger/L1TMuon/interface/MicroGMTIsolationUnit.h"
 
 #include "L1Trigger/L1TMuon/interface/GMTInternalMuon.h"
 #include "DataFormats/L1TMuon/interface/MuonCaloSum.h"
@@ -202,7 +202,7 @@ void l1t::MicroGMTIsolationUnit::setTowerSums(const MicroGMTConfiguration::CaloI
 
 void l1t::MicroGMTIsolationUnit::isolatePreSummed(MicroGMTConfiguration::InterMuonList& muons) const
 {
-  for (auto mu : muons) {
+  for (const auto &mu : muons) {
     int caloIndex = getCaloIndex(*mu);
     int energySum = 0;
     if (m_towerEnergies.count(caloIndex) == 1) {

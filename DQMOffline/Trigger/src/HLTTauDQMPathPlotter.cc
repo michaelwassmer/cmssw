@@ -164,7 +164,7 @@ void HLTTauDQMPathPlotter::bookHistograms(DQMStore::IBooker &iBooker) {
 }
 
 
-HLTTauDQMPathPlotter::~HLTTauDQMPathPlotter() {}
+HLTTauDQMPathPlotter::~HLTTauDQMPathPlotter() = default;
 
 void HLTTauDQMPathPlotter::analyze(const edm::TriggerResults& triggerResults, const trigger::TriggerEvent& triggerEvent, const HLTTauDQMOfflineObjects& refCollection) {
   std::vector<HLTTauDQMPath::Object> triggerObjs;
@@ -200,7 +200,9 @@ void HLTTauDQMPathPlotter::analyze(const edm::TriggerResults& triggerResults, co
       if(hltPath_.getFilterType(i) == "HLTMuonL3PreFilter" || hltPath_.getFilterType(i) == "HLTMuonIsoFilter") lastMatchedMuonFilter = i;
       if(hltPath_.getFilterName(i).find("hltEle") < hltPath_.getFilterName(i).length()) lastMatchedElectronFilter = i;
       if(hltPath_.getFilterName(i).find("hltPFTau") < hltPath_.getFilterName(i).length() || 
-         hltPath_.getFilterName(i).find("hltDoublePFTau") < hltPath_.getFilterName(i).length())    lastMatchedTauFilter = i;
+         hltPath_.getFilterName(i).find("hltHpsPFTau") < hltPath_.getFilterName(i).length() ||
+         hltPath_.getFilterName(i).find("hltDoublePFTau") < hltPath_.getFilterName(i).length() ||
+         hltPath_.getFilterName(i).find("hltHpsDoublePFTau") < hltPath_.getFilterName(i).length())    lastMatchedTauFilter = i;
       if(firstMatchedMETFilter < 0 && hltPath_.getFilterName(i).find("hltMET") < hltPath_.getFilterName(i).length()) firstMatchedMETFilter = i;
     }
   }
@@ -448,7 +450,7 @@ void HLTTauDQMPathPlotter::analyze(const edm::TriggerResults& triggerResults, co
           }
         }
       }
-    
+
       // Triggered object kinematics
       for(const HLTTauDQMPath::Object& obj: triggerObjs) {
         if(obj.id == trigger::TriggerTau){

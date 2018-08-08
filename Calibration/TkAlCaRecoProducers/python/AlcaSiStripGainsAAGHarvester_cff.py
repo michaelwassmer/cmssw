@@ -7,8 +7,11 @@ EDMtoMEConvertSiStripGainsAAG = EDMtoMEConverter.clone()
 EDMtoMEConvertSiStripGainsAAG.lumiInputTag = cms.InputTag("MEtoEDMConvertSiStripGainsAAG","MEtoEDMConverterLumi")
 EDMtoMEConvertSiStripGainsAAG.runInputTag = cms.InputTag("MEtoEDMConvertSiStripGainsAAG","MEtoEDMConverterRun")
 
-
 DQMStore = cms.Service("DQMStore")
 
-ALCAHARVESTSiStripGainsAAG = cms.Sequence( EDMtoMEConvertSiStripGainsAAG +
-                                                     alcaSiStripGainsAAGHarvester)
+from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+dqmEnvSiStripGainsAAG = DQMEDAnalyzer('DQMEventInfo',
+                                       subSystemFolder = cms.untracked.string('AlCaReco'),  
+                                       )
+
+ALCAHARVESTSiStripGainsAAG = cms.Sequence( EDMtoMEConvertSiStripGainsAAG + alcaSiStripGainsAAGHarvester + dqmEnvSiStripGainsAAG )

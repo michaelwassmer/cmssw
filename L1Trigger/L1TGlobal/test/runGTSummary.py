@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import FWCore.ParameterSet.Config as cms
 
 from Configuration.StandardSequences.Eras import eras
@@ -70,7 +71,7 @@ process.L1TGlobalSummary.DumpTrigResults= cms.bool(True)
 ## process.l1tGlobalSummary.psColumn = cms.int32(0)
 
 process.raw2digi_step = cms.Path(process.RawToDigi)
-process.p = cms.Path(process.l1tGlobalSummary)
+process.p = cms.Path(process.L1TGlobalSummary)
 
 process.schedule = cms.Schedule(process.raw2digi_step,process.p)
 
@@ -82,5 +83,5 @@ if rootout:
 dump=False
 if dump:
     outfile = open('dump_config.py','w')
-    print >> outfile,process.dumpPython()
+    print(process.dumpPython(), file=outfile)
     outfile.close()
