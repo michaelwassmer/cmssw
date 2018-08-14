@@ -3,6 +3,7 @@
 // author D.Kovalskyi
 #include "HLTrigger/HLTcore/interface/HLTFilter.h"
 #include "DataFormats/RecoCandidate/interface/RecoChargedCandidateFwd.h"
+#include "DataFormats/MuonReco/interface/MuonFwd.h"
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 
 namespace edm {
@@ -12,9 +13,9 @@ namespace edm {
 class HLTDiMuonGlbTrkFilter : public HLTFilter {
  public:
   HLTDiMuonGlbTrkFilter(const edm::ParameterSet&);
-  virtual ~HLTDiMuonGlbTrkFilter(){}
+  ~HLTDiMuonGlbTrkFilter() override{}
   static void fillDescriptions(edm::ConfigurationDescriptions & descriptions);
-  virtual bool hltFilter(edm::Event&, const edm::EventSetup&, trigger::TriggerFilterObjectWithRefs & filterproduct) const override;
+  bool hltFilter(edm::Event&, const edm::EventSetup&, trigger::TriggerFilterObjectWithRefs & filterproduct) const override;
 
  private:
   // WARNING: two input collection represent should be aligned and represent

@@ -10,14 +10,10 @@
 #include "DataFormats/EgammaCandidates/interface/ConversionFwd.h"
 #include "DataFormats/EgammaCandidates/interface/Conversion.h"
 #include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
-
-#include "CondFormats/EgammaObjects/interface/GBRForest.h"
+#include "RecoEgamma/EgammaTools/interface/GBRForestTools.h"
 
 #include <vector>
 #include <string>
-#include "TMVA/Factory.h"
-#include "TMVA/Tools.h"
-#include "TMVA/Reader.h"
 
 class ElectronMVAEstimatorRun2Spring16HZZ : public AnyMVAEstimatorRun2Base{
   
@@ -88,7 +84,7 @@ class ElectronMVAEstimatorRun2Spring16HZZ : public AnyMVAEstimatorRun2Base{
   ElectronMVAEstimatorRun2Spring16HZZ(); // For Reflex. Not to be used in reality
   ElectronMVAEstimatorRun2Spring16HZZ(const std::string &mvaTag, const std::string &conversionsTag = "reducedEgamma:reducedConversions", const std::string &beamspotTag = "offlineBeamSpot");
   void init(const std::vector <std::string> weightFileNames);
-  ~ElectronMVAEstimatorRun2Spring16HZZ();
+  ~ElectronMVAEstimatorRun2Spring16HZZ() override;
 
 
 
@@ -100,13 +96,10 @@ class ElectronMVAEstimatorRun2Spring16HZZ : public AnyMVAEstimatorRun2Base{
   float mvaValue( const int iCategory, const std::vector<float> & vars) const ;
 
   // Utility functions
-  std::unique_ptr<const GBRForest> createSingleReader(const int iCategory, 
-                                                      const edm::FileInPath &weightFile);
-
-  virtual int getNCategories() const override { return nCategories; }
+  int getNCategories() const override { return nCategories; }
   bool isEndcapCategory( int category ) const;
-  virtual const std::string& getName() const override final { return name_; }
-  virtual const std::string& getTag() const override final { return tag_; }
+  const std::string& getName() const final { return name_; }
+  const std::string& getTag() const final { return tag_; }
 
   // Functions that should work on both pat and reco electrons
   // (use the fact that pat::Electron inherits from reco::GsfElectron)
@@ -120,7 +113,7 @@ class ElectronMVAEstimatorRun2Spring16HZZ : public AnyMVAEstimatorRun2Base{
 
   // Call this function once after the constructor to declare
   // the needed event content pieces to the framework
-  void setConsumes(edm::ConsumesCollector&&) const override final;
+  void setConsumes(edm::ConsumesCollector&&) const final;
   // Call this function once per event to retrieve all needed
   // event content pices
   

@@ -23,7 +23,8 @@ updateJetCollection(
    process,
    jetSource = cms.InputTag('slimmedJets'),
    jetCorrections = ('AK4PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
-   btagDiscriminators = ['pfCombinedSecondaryVertexV2BJetTags'] ## to add discriminators
+   btagDiscriminators = ['pfCombinedSecondaryVertexV2BJetTags', 'pfDeepCSVDiscriminatorsJetTags:BvsAll', 'pfDeepCSVDiscriminatorsJetTags:CvsB', 'pfDeepCSVDiscriminatorsJetTags:CvsL'], ## to add discriminators,
+   btagPrefix = 'TEST',
 )
 process.updatedPatJets.userData.userFloats.src += ['oldJetMass']
 
@@ -60,6 +61,20 @@ updateJetCollection(
    algo = 'ak'                  # has to be defined but is not used with svClustering=False
 )
 process.updatedPatJetsSoftDropSubjets.userData.userFloats.src = []
+
+## An example where puppi jet specifics are computed
+from PhysicsTools.PatAlgos.patPuppiJetSpecificProducer_cfi import patPuppiJetSpecificProducer
+process.patPuppiJetSpecificProducer = patPuppiJetSpecificProducer.clone(
+  src=cms.InputTag("slimmedJetsPuppi"),
+  )
+patAlgosToolsTask.add(process.patPuppiJetSpecificProducer)
+
+updateJetCollection(
+   process,
+   labelName = 'PuppiJetSpecific',
+   jetSource = cms.InputTag('slimmedJetsPuppi'),
+)
+process.updatedPatJetsPuppiJetSpecific.userData.userFloats.src = ['patPuppiJetSpecificProducer:puppiMultiplicity', 'patPuppiJetSpecificProducer:neutralPuppiMultiplicity', 'patPuppiJetSpecificProducer:neutralHadronPuppiMultiplicity', 'patPuppiJetSpecificProducer:photonPuppiMultiplicity', 'patPuppiJetSpecificProducer:HFHadronPuppiMultiplicity', 'patPuppiJetSpecificProducer:HFEMPuppiMultiplicity' ]
 
 ## ------------------------------------------------------
 #  In addition you usually want to change the following

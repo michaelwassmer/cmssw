@@ -3,7 +3,7 @@
 
 #include <cassert>
 #include <iosfwd>
-#include <string.h> // bzero
+#include <cstring> // bzero
 #include "FWCore/Utilities/interface/Exception.h"
 #include "DataFormats/CSCDigi/interface/CSCDMBStatusDigi.h"
 #include "EventFilter/CSCRawToDigi/interface/CSCVDMBHeaderFormat.h"
@@ -27,7 +27,6 @@ public:
 
 
   bool cfebAvailable(unsigned icfeb) { 
-	assert (icfeb < (theFirmwareVersion==2013)?7:5);
 	return (theHeaderFormat->cfebAvailable() >> icfeb) & 1;
     }
 

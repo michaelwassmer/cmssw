@@ -34,17 +34,17 @@ HLTTauDQMOfflineSource::HLTTauDQMOfflineSource( const edm::ParameterSet& ps ):
   doRefAnalysis_ = matching.getUntrackedParameter<bool>("doMatching");
 
   if(ps.exists("L1Plotter") && !ps.exists("TagAndProbe")) {
-    l1Plotter_.reset(new HLTTauDQML1Plotter(ps.getUntrackedParameter<edm::ParameterSet>("L1Plotter"), consumesCollector(),
-                                            nPhiBins_, ptMax_, highPtMax_, doRefAnalysis_, l1MatchDr_, dqmBaseFolder_));
+    l1Plotter_ = std::make_unique<HLTTauDQML1Plotter>(ps.getUntrackedParameter<edm::ParameterSet>("L1Plotter"), consumesCollector(),
+                                            nPhiBins_, ptMax_, highPtMax_, doRefAnalysis_, l1MatchDr_, dqmBaseFolder_);
   }
   if(ps.exists("PathSummaryPlotter")) {
-    pathSummaryPlotter_.reset(new HLTTauDQMPathSummaryPlotter(ps.getUntrackedParameter<edm::ParameterSet>("PathSummaryPlotter"),
-                                                              doRefAnalysis_, dqmBaseFolder_, hltMatchDr_));
+    pathSummaryPlotter_ = std::make_unique<HLTTauDQMPathSummaryPlotter>(ps.getUntrackedParameter<edm::ParameterSet>("PathSummaryPlotter"),
+                                                              doRefAnalysis_, dqmBaseFolder_, hltMatchDr_);
   }
-  tagAndProbe = false;
+  tagAndProbe_ = false;
   if(ps.exists("TagAndProbe")) {
     std::vector<edm::ParameterSet> tagAndProbePaths = ps.getUntrackedParameter<std::vector<edm::ParameterSet> >("TagAndProbe");
-    tagAndProbe = true;
+    tagAndProbe_ = true;
     //    tagandprobePlotters_.reserve(tagAndProbePaths.size()); 
     for(const edm::ParameterSet& tpset: tagAndProbePaths) {
       num_genTriggerEventFlag_.emplace_back(new GenericTriggerEventFlag(tpset.getParameter<edm::ParameterSet>("numerator"),consumesCollector(), *this));
@@ -63,8 +63,7 @@ HLTTauDQMOfflineSource::HLTTauDQMOfflineSource( const edm::ParameterSet& ps ):
   }
 }
 
-HLTTauDQMOfflineSource::~HLTTauDQMOfflineSource() {
-}
+HLTTauDQMOfflineSource::~HLTTauDQMOfflineSource() = default;
 
 //--------------------------------------------------------
 void HLTTauDQMOfflineSource::dqmBeginRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
@@ -85,7 +84,7 @@ void HLTTauDQMOfflineSource::dqmBeginRun(const edm::Run& iRun, const edm::EventS
       }
       std::sort(foundPaths.begin(), foundPaths.end());
 
-      if(tagAndProbe) {
+      if(!tagAndProbe_) {
         // Construct path plotters
         std::vector<const HLTTauDQMPath *> pathObjects;
         pathPlotters_.reserve(foundPaths.size());  

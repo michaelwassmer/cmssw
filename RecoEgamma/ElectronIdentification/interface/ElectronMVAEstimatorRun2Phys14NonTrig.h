@@ -2,19 +2,13 @@
 #define RecoEgamma_ElectronIdentification_ElectronMVAEstimatorRun2Phys14NonTrig_H
 
 #include "RecoEgamma/EgammaTools/interface/AnyMVAEstimatorRun2Base.h"
-
 #include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
-
-#include "CondFormats/EgammaObjects/interface/GBRForest.h"
+#include "RecoEgamma/EgammaTools/interface/GBRForestTools.h"
 
 #include <vector>
 #include <string>
 #include <memory>
 #include <TROOT.h>
-#include "TMVA/Factory.h"
-#include "TMVA/Tools.h"
-#include "TMVA/Reader.h"
-#include "TMVA/MethodBDT.h"
 
 class ElectronMVAEstimatorRun2Phys14NonTrig : public AnyMVAEstimatorRun2Base{
   
@@ -67,18 +61,16 @@ class ElectronMVAEstimatorRun2Phys14NonTrig : public AnyMVAEstimatorRun2Base{
   
   // Constructor and destructor
   ElectronMVAEstimatorRun2Phys14NonTrig(const edm::ParameterSet& conf);
-  ~ElectronMVAEstimatorRun2Phys14NonTrig();
+  ~ElectronMVAEstimatorRun2Phys14NonTrig() override;
 
   // Calculation of the MVA value
   float mvaValue( const edm::Ptr<reco::Candidate>& particle, const edm::Event& evt) const override;
- 
-  // Utility functions
-  std::unique_ptr<const GBRForest> createSingleReader(const int iCategory, const edm::FileInPath &weightFile) ;
   
-  virtual int getNCategories() const override final { return nCategories; }
+  // Utility functions
+  int getNCategories() const final { return nCategories; }
   bool isEndcapCategory( int category ) const;
-  virtual const std::string& getName() const override final { return _name; } 
-  virtual const std::string& getTag() const override final { return _tag; }
+  const std::string& getName() const final { return _name; } 
+  const std::string& getTag() const final { return _tag; }
   
   // Functions that should work on both pat and reco electrons
   // (use the fact that pat::Electron inherits from reco::GsfElectron)

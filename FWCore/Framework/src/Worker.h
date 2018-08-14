@@ -39,6 +39,7 @@ the worker is reset().
 #include "FWCore/ServiceRegistry/interface/PlaceInPathContext.h"
 #include "FWCore/ServiceRegistry/interface/ServiceRegistry.h"
 #include "FWCore/Concurrency/interface/SerialTaskQueueChain.h"
+#include "FWCore/Concurrency/interface/LimitedTaskQueue.h"
 #include "FWCore/Concurrency/interface/FunctorTask.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "FWCore/Utilities/interface/ConvertException.h"
@@ -50,6 +51,7 @@ the worker is reset().
 
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -77,6 +79,34 @@ namespace edm {
   public:
     enum State { Ready, Pass, Fail, Exception };
     enum Types { kAnalyzer, kFilter, kProducer, kOutputModule};
+    struct TaskQueueAdaptor {
+      SerialTaskQueueChain* serial_ = nullptr;
+      LimitedTaskQueue* limited_ = nullptr;
+      
+      TaskQueueAdaptor() = default;
+      TaskQueueAdaptor(SerialTaskQueueChain* iChain): serial_(iChain) {}
+      TaskQueueAdaptor(LimitedTaskQueue* iLimited): limited_(iLimited) {}
+      
+      operator bool() { return serial_ != nullptr or limited_ != nullptr; }
+      
+      template <class F>
+      void push(F&& iF) {
+        if(serial_) {
+          serial_->push(iF);
+        } else {
+          limited_->push(iF);
+        }
+      }
+      template <class F>
+      void pushAndWait(F&& iF) {
+        if(serial_) {
+          serial_->pushAndWait(iF);
+        } else {
+          limited_->pushAndWait(iF);
+        }
+      }
+      
+    };
 
     Worker(ModuleDescription const& iMD, ExceptionToActionTable const* iActions);
     virtual ~Worker();
@@ -104,6 +134,13 @@ namespace edm {
                                   ParentContext const& parentContext,
                                   typename T::Context const* context);
 
+    template <typename T>
+    std::exception_ptr runModuleDirectly(typename T::MyPrincipal const& ep,
+                                         EventSetup const& es,
+                                         StreamID streamID,
+                                         ParentContext const& parentContext,
+                                         typename T::Context const* context);
+
     void callWhenDoneAsync(WaitingTask* task) {
       waitingTasks_.add(task);
     }
@@ -115,8 +152,6 @@ namespace edm {
     void respondToOpenInputFile(FileBlock const& fb) {implRespondToOpenInputFile(fb);}
     void respondToCloseInputFile(FileBlock const& fb) {implRespondToCloseInputFile(fb);}
 
-    void preForkReleaseResources() {implPreForkReleaseResources();}
-    void postForkReacquireResources(unsigned int iChildIndex, unsigned int iNumberOfChildren) {implPostForkReacquireResources(iChildIndex, iNumberOfChildren);}
     void registerThinnedAssociations(ProductRegistry const& registry, ThinnedAssociationsHelper& helper) { implRegisterThinnedAssociations(registry, helper); }
 
     void reset() {
@@ -141,11 +176,13 @@ namespace edm {
     virtual void updateLookup(BranchType iBranchType,
                       ProductResolverIndexHelper const&) = 0;
     virtual void resolvePutIndicies(BranchType iBranchType,
-                                    std::unordered_multimap<std::string, edm::ProductResolverIndex> const& iIndicies) = 0;
+                                    std::unordered_multimap<std::string, std::tuple<TypeID const*, const char*, edm::ProductResolverIndex>> const& iIndicies) = 0;
 
     virtual void modulesWhoseProductsAreConsumed(std::vector<ModuleDescription const*>& modules,
                                                  ProductRegistry const& preg,
                                                  std::map<std::string, ModuleDescription const*> const& labelsToDesc) const = 0;
+
+    virtual void convertCurrentProcessAlias(std::string const& processName) = 0;
 
     virtual std::vector<ConsumesInfo> consumesInfo() const = 0;
 
@@ -226,12 +263,9 @@ namespace edm {
     virtual void implRespondToOpenInputFile(FileBlock const& fb) = 0;
     virtual void implRespondToCloseInputFile(FileBlock const& fb) = 0;
 
-    virtual void implPreForkReleaseResources() = 0;
-    virtual void implPostForkReacquireResources(unsigned int iChildIndex,
-                                               unsigned int iNumberOfChildren) = 0;
     virtual void implRegisterThinnedAssociations(ProductRegistry const&, ThinnedAssociationsHelper&) = 0;
     
-    virtual SerialTaskQueueChain* serializeRunModule() = 0;
+    virtual TaskQueueAdaptor serializeRunModule() = 0;
     
     static void exceptionContext(cms::Exception& ex,
                                  ModuleCallingContext const* mcc);
@@ -251,7 +285,7 @@ namespace edm {
     class TransitionIDValue : public TransitionIDValueBase {
     public:
       TransitionIDValue(T const& iP): p_(iP) {}
-      virtual std::string value() const override {
+      std::string value() const override {
         std::ostringstream iost;
         iost<<p_.id();
         return iost.str();
@@ -303,12 +337,12 @@ namespace edm {
     }
     
     template<typename T>
-    void runModuleAfterAsyncPrefetch(std::exception_ptr const * iEPtr,
-                                     typename T::MyPrincipal const& ep,
-                                     EventSetup const& es,
-                                     StreamID streamID,
-                                     ParentContext const& parentContext,
-                                     typename T::Context const* context);
+    std::exception_ptr runModuleAfterAsyncPrefetch(std::exception_ptr const * iEPtr,
+                                                   typename T::MyPrincipal const& ep,
+                                                   EventSetup const& es,
+                                                   StreamID streamID,
+                                                   ParentContext const& parentContext,
+                                                   typename T::Context const* context);
         
     template< typename T>
     class RunModuleTask : public WaitingTask {
@@ -356,7 +390,7 @@ namespace edm {
             auto parentContext = m_parentContext;
             auto serviceToken = m_serviceToken;
             auto sContext = m_context;
-            queue->push( [worker, &principal, &es, streamID,parentContext,sContext, serviceToken]()
+            queue.push( [worker, &principal, &es, streamID,parentContext,sContext, serviceToken]()
             {
               //Need to make the services available
               ServiceRegistry::Operate guard(serviceToken);
@@ -643,12 +677,12 @@ namespace edm {
   }
      
   template<typename T>
-  void Worker::runModuleAfterAsyncPrefetch(std::exception_ptr const* iEPtr,
-                                   typename T::MyPrincipal const& ep,
-                                   EventSetup const& es,
-                                   StreamID streamID,
-                                   ParentContext const& parentContext,
-                                   typename T::Context const* context) {
+  std::exception_ptr Worker::runModuleAfterAsyncPrefetch(std::exception_ptr const* iEPtr,
+                                                         typename T::MyPrincipal const& ep,
+                                                         EventSetup const& es,
+                                                         StreamID streamID,
+                                                         ParentContext const& parentContext,
+                                                         typename T::Context const* context) {
     std::exception_ptr exceptionPtr;
     if(iEPtr) {
       assert(*iEPtr);
@@ -668,6 +702,7 @@ namespace edm {
       }
     }
     waitingTasks_.doneWaiting(exceptionPtr);
+    return exceptionPtr;
   }
 
   template <typename T>
@@ -700,7 +735,7 @@ namespace edm {
         this->waitingTasks_.doneWaiting(exceptionPtr);
       };
       if(auto queue = this->serializeRunModule()) {
-        queue->push( toDo);
+        queue.push( toDo);
       } else {
         auto task = make_functor_task( tbb::task::allocate_root(), toDo);
         tbb::task::spawn(*task);
@@ -800,7 +835,7 @@ namespace edm {
     prefetchSentry.release();
     if(auto queue = serializeRunModule()) {
       auto serviceToken = ServiceRegistry::instance().presentToken();
-      queue->pushAndWait([&]() {
+      queue.pushAndWait([&]() {
         //Need to make the services available
         ServiceRegistry::Operate guard(serviceToken);
         try {
@@ -864,6 +899,18 @@ namespace edm {
     }
     
     return rc;
+  }
+
+  template <typename T>
+  std::exception_ptr Worker::runModuleDirectly(typename T::MyPrincipal const& ep,
+                                               EventSetup const& es,
+                                               StreamID streamID,
+                                               ParentContext const& parentContext,
+                                               typename T::Context const* context) {
+
+    timesVisited_.fetch_add(1,std::memory_order_relaxed);
+    std::exception_ptr const* prefetchingException = nullptr; // null because there was no prefetching to do
+    return runModuleAfterAsyncPrefetch<T>(prefetchingException, ep, es, streamID, parentContext, context);
   }
 }
 #endif

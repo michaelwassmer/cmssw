@@ -24,9 +24,9 @@ class HLTMuonL2FromL1TPreFilter : public HLTFilter {
 
   public:
     explicit HLTMuonL2FromL1TPreFilter(const edm::ParameterSet&);
-    ~HLTMuonL2FromL1TPreFilter();
+    ~HLTMuonL2FromL1TPreFilter() override;
     static void fillDescriptions(edm::ConfigurationDescriptions & descriptions);
-    virtual bool hltFilter(edm::Event&, const edm::EventSetup&, trigger::TriggerFilterObjectWithRefs & filterproduct) const override;
+    bool hltFilter(edm::Event&, const edm::EventSetup&, trigger::TriggerFilterObjectWithRefs & filterproduct) const override;
 
   private:
     /// input tag of the beam spot
@@ -84,6 +84,10 @@ class HLTMuonL2FromL1TPreFilter : public HLTFilter {
 
     /// pt uncertainty margin (in number of sigmas)
     double nSigmaPt_;
+
+    /// require the matching with the L1 firing the L1 filter
+    bool matchPreviousCand_;
+
 };
 
 #endif //HLTMuonL2FromL1TPreFilter_h

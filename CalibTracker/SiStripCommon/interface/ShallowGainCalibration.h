@@ -27,7 +27,7 @@
 #include "DataFormats/GeometrySurface/interface/TrapezoidalPlaneBounds.h"
 #include "DataFormats/GeometrySurface/interface/RectangularPlaneBounds.h"
 
-#include "Geometry/CommonDetUnit/interface/GeomDetUnit.h"
+#include "Geometry/CommonDetUnit/interface/GeomDet.h"
 #include "Geometry/CommonDetUnit/interface/GeomDetType.h"
 #include "Geometry/CommonTopologies/interface/StripTopology.h"
 
@@ -66,7 +66,7 @@ private:
   std::string Suffix;
   std::string Prefix;
 
-  void   produce( edm::Event &, const edm::EventSetup & );
+  void   produce( edm::Event &, const edm::EventSetup & ) override;
 //  virtual void beginJob(EventSetup const&);
 //  virtual void beginRun(Run&, EventSetup const&);
   bool   IsFarFromBorder(TrajectoryStateOnSurface* trajState, const uint32_t detid, const edm::EventSetup* iSetup);

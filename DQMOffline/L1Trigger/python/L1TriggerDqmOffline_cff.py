@@ -47,6 +47,7 @@ from DQMOffline.L1Trigger.L1TSync_Offline_cfi import *
 from DQMOffline.L1Trigger.L1TEmulatorMonitorOffline_cff import *
 from DQMOffline.L1Trigger.L1TStage2CaloLayer2Offline_cfi import *
 from DQMOffline.L1Trigger.L1TEGammaOffline_cfi import *
+from DQMOffline.L1Trigger.L1TTauOffline_cfi import *
 l1TdeRCT.rctSourceData = 'gctDigis'
 
 # DQM Offline Step 2 cfi/cff imports
@@ -139,9 +140,7 @@ l1TriggerOnline = cms.Sequence(
 
 l1TriggerOffline = cms.Sequence(
     l1TriggerOnline *
-    dqmEnvL1TriggerReco *
-    l1tStage2CaloLayer2OfflineDQM *
-    l1tEGammaOfflineDQM
+    dqmEnvL1TriggerReco
 )
 
 #
@@ -152,9 +151,7 @@ l1TriggerEmulatorOnline = cms.Sequence(
                                 )
 
 l1TriggerEmulatorOffline = cms.Sequence(
-    l1TriggerEmulatorOnline *
-    l1tStage2CaloLayer2OfflineDQMEmu *
-    l1tEGammaOfflineDQMEmu
+    l1TriggerEmulatorOnline 
 )
 #
 
@@ -261,20 +258,26 @@ l1EmulatorMonitorClient.remove(l1EmulatorErrorFlagClient)
 #stage2 
 from Configuration.Eras.Modifier_stage2L1Trigger_cff import stage2L1Trigger
 
-from L1Trigger.L1TGlobal.hackConditions_cff import *
-from L1Trigger.L1TMuon.hackConditions_cff import *
-from L1Trigger.L1TCalorimeter.hackConditions_cff import *
+#from L1Trigger.L1TGlobal.hackConditions_cff import *
+#from L1Trigger.L1TMuon.hackConditions_cff import *
+#from L1Trigger.L1TCalorimeter.hackConditions_cff import *
+from L1Trigger.L1TGlobal.GlobalParameters_cff import *
+
+# 2017 EMTF emulator uses payloads and forests from DB, but not yet in GT
+from L1Trigger.L1TMuonEndCap.fakeEmtfParams_2017_MC_cff import *
 
 from DQMOffline.L1Trigger.L1TStage2CaloLayer2Offline_cfi import *
 l1tStage2CaloLayer2OfflineDQMEmu.stage2CaloLayer2JetSource=cms.InputTag("valCaloStage2Layer2Digis")
 l1tStage2CaloLayer2OfflineDQMEmu.stage2CaloLayer2EtSumSource=cms.InputTag("valCaloStage2Layer2Digis")
 from DQMOffline.L1Trigger.L1TEGammaOffline_cfi import *
 l1tEGammaOfflineDQMEmu.stage2CaloLayer2EGammaSource=cms.InputTag("valCaloStage2Layer2Digis")
-from DQMOffline.L1Trigger.L1TEfficiencyMuons_Offline_cfi import *
 
-from Configuration.StandardSequences.Eras import eras
+from DQMOffline.L1Trigger.L1TTauOffline_cfi import *
+l1tTauOfflineDQMEmu.stage2CaloLayer2TaySource=cms.InputTag("valCaloStage2Layer2Digis")
+from DQMOffline.L1Trigger.L1TMuonDQMOffline_cfi import *
+
 from DQM.L1TMonitor.L1TStage2_cff import *
-from DQMOffline.L1Trigger.L1TEfficiencyHarvesting_cfi import *
+from DQMOffline.L1Trigger.L1TriggerDqmOffline_SecondStep_cff import *
 
 stage2UnpackPath = cms.Sequence(
      l1tCaloLayer1Digis +
@@ -311,7 +314,9 @@ Stage2l1TriggerOnline = cms.Sequence(
                                 * l1tStage2OnlineDQM
                                 * dqmEnvL1T
                                )
-
+# Do not include the uGT online DQM module in the offline sequence
+# since the large 2D histograms cause crashes at the T0.
+l1tStage2OnlineDQM.remove(l1tStage2uGt)
 
 
 
@@ -319,7 +324,8 @@ Stage2l1TriggerOffline = cms.Sequence(
                                 Stage2l1TriggerOnline *
                                 dqmEnvL1TriggerReco *
                                 l1tStage2CaloLayer2OfflineDQM *
-                                l1tEGammaOfflineDQM
+                                l1tEGammaOfflineDQM *
+                                l1tTauOfflineDQM
 
                                 )
 
@@ -336,7 +342,8 @@ Stage2l1TriggerEmulatorOnline = cms.Sequence(
 Stage2l1TriggerEmulatorOffline = cms.Sequence(
                                 Stage2l1TriggerEmulatorOnline +
                                 l1tStage2CaloLayer2OfflineDQMEmu +
-                                l1tEGammaOfflineDQMEmu
+                                l1tEGammaOfflineDQMEmu +
+                                l1tTauOfflineDQMEmu
                                 )
 
 #
@@ -347,14 +354,14 @@ Stage2l1TriggerDqmOffline = cms.Sequence(
  #                               * l1tRate_Offline
   #                              * l1tSync_Offline
                                 * Stage2l1TriggerEmulatorOffline
-                                * l1tEfficiencyMuons_offline
+                                * l1tMuonDQMOffline
                                 )
 
 # DQM Offline Step 2 sequence                                 
 Stage2l1TriggerDqmOfflineClient = cms.Sequence(
                                 l1tStage2EmulatorMonitorClient *
                                 l1tStage2MonitorClient *
-                                l1tEfficiencyMuons_Harvesting
+                                DQMHarvestL1Trigger
                                 )
 
 

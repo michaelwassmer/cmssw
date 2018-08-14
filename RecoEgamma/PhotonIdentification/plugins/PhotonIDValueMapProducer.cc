@@ -42,13 +42,13 @@ class PhotonIDValueMapProducer : public edm::stream::EDProducer<> {
   public:
   
   explicit PhotonIDValueMapProducer(const edm::ParameterSet&);
-  ~PhotonIDValueMapProducer();
+  ~PhotonIDValueMapProducer() override;
   
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
   private:
   
-  virtual void produce(edm::Event&, const edm::EventSetup&) override;
+  void produce(edm::Event&, const edm::EventSetup&) override;
 
   void writeValueMap(edm::Event &iEvent,
 		     const edm::Handle<edm::View<reco::Photon> > & handle,
@@ -67,7 +67,7 @@ class PhotonIDValueMapProducer : public edm::stream::EDProducer<> {
   float computeWorstPFChargedIsolation(const T& photon,
 				       const U& pfCandidates,
 				       const edm::Handle<reco::VertexCollection> vertices,
-				       bool isAOD,
+				       bool isAOD, bool isPVConstraint,const reco::Vertex& pv,
 				       float dRmax, float dxyMax, float dzMax,
 				       float dRvetoBarrel, float dRvetoEndcap, float ptMin);
 
@@ -77,6 +77,9 @@ class PhotonIDValueMapProducer : public edm::stream::EDProducer<> {
   candidatePdgId(const edm::Ptr<reco::Candidate> candidate, bool isAOD);
 
   const reco::Track* getTrackPointer(const edm::Ptr<reco::Candidate> candidate, bool isAOD);
+  void getImpactParameters(const edm::Ptr<reco::Candidate>& candidate,
+                           bool isAOD, const reco::Vertex& pv, float &dxy, float &dz);
+
 
 
   // The object that will compute 5x5 quantities  
@@ -117,6 +120,13 @@ class PhotonIDValueMapProducer : public edm::stream::EDProducer<> {
   constexpr static char phoPhotonIsolation_[] = "phoPhotonIsolation";
   constexpr static char phoWorstChargedIsolation_[] = "phoWorstChargedIsolation";
   constexpr static char phoWorstChargedIsolationWithConeVeto_[] = "phoWorstChargedIsolationWithConeVeto";
+  constexpr static char phoWorstChargedIsolationWithPVConstraint_[] = "phoWorstChargedIsolationWithPVConstraint";
+  constexpr static char phoWorstChargedIsolationWithConeVetoWithPVConstraint_[] = "phoWorstChargedIsolationWithConeVetoWithPVConstraint";
+
+  //PFCluster Isolation
+  constexpr static char phoTrkIsolation_[] = "phoTrkIsolation";
+  constexpr static char phoHcalPFClIsolation_[] = "phoHcalPFClIsolation";
+  constexpr static char phoEcalPFClIsolation_[] = "phoEcalPFClIsolation";
 
 };
 
@@ -134,6 +144,14 @@ constexpr char PhotonIDValueMapProducer::phoNeutralHadronIsolation_[];
 constexpr char PhotonIDValueMapProducer::phoPhotonIsolation_[];
 constexpr char PhotonIDValueMapProducer::phoWorstChargedIsolation_[];
 constexpr char PhotonIDValueMapProducer::phoWorstChargedIsolationWithConeVeto_[];
+constexpr char PhotonIDValueMapProducer::phoWorstChargedIsolationWithPVConstraint_[];
+constexpr char PhotonIDValueMapProducer::phoWorstChargedIsolationWithConeVetoWithPVConstraint_[];
+
+//PFCluster Isolation
+constexpr char PhotonIDValueMapProducer::phoTrkIsolation_[];
+constexpr char PhotonIDValueMapProducer::phoHcalPFClIsolation_[];
+constexpr char PhotonIDValueMapProducer::phoEcalPFClIsolation_[];
+
 
 PhotonIDValueMapProducer::PhotonIDValueMapProducer(const edm::ParameterSet& iConfig) {
 
@@ -197,6 +215,14 @@ PhotonIDValueMapProducer::PhotonIDValueMapProducer(const edm::ParameterSet& iCon
   produces<edm::ValueMap<float> >(phoPhotonIsolation_);  
   produces<edm::ValueMap<float> >(phoWorstChargedIsolation_);  
   produces<edm::ValueMap<float> >(phoWorstChargedIsolationWithConeVeto_);  
+  produces<edm::ValueMap<float> >(phoWorstChargedIsolationWithPVConstraint_);  
+  produces<edm::ValueMap<float> >(phoWorstChargedIsolationWithConeVetoWithPVConstraint_);  
+
+  //PFCluster  Isolations
+  produces<edm::ValueMap<float> >(phoTrkIsolation_);  
+  produces<edm::ValueMap<float> >(phoHcalPFClIsolation_);  
+  produces<edm::ValueMap<float> >(phoEcalPFClIsolation_);  
+
 
 }
 
@@ -269,7 +295,7 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
   if( !pfCandidatesHandle.isValid() )
     iEvent.getByToken(pfCandidatesTokenMiniAOD_, pfCandidatesHandle);
 
-  if( !isAOD && src->size() ) {
+  if( !isAOD && !src->empty() ) {
     edm::Ptr<pat::Photon> test(src->ptrAt(0));
     if( test.isNull() || !test.isAvailable() ) {
       throw cms::Exception("InvalidConfiguration")
@@ -292,6 +318,13 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
   std::vector<float> phoPhotonIsolation;
   std::vector<float> phoWorstChargedIsolation;
   std::vector<float> phoWorstChargedIsolationWithConeVeto;
+  std::vector<float> phoWorstChargedIsolationWithPVConstraint;
+  std::vector<float> phoWorstChargedIsolationWithConeVetoWithPVConstraint;
+
+  //PFCluster Isolations
+  std::vector<float> phoTrkIsolation;
+  std::vector<float> phoHcalPFClIsolation;
+  std::vector<float> phoEcalPFClIsolation;
   
   // reco::Photon::superCluster() is virtual so we can exploit polymorphism
   for (unsigned idxpho = 0; idxpho < src->size(); ++idxpho) {
@@ -328,6 +361,21 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
     math::XYZVector photon_directionWrtVtx(iPho->superCluster()->x() - pv.x(),
                                            iPho->superCluster()->y() - pv.y(),
                                            iPho->superCluster()->z() - pv.z());
+
+    //PFCluster Isolations
+    phoTrkIsolation      .push_back( iPho->trkSumPtSolidConeDR04());
+    if (isAOD)                                                                                                                                                                  
+      {                                                                                                                                                                          
+	phoHcalPFClIsolation .push_back(0.f);
+	phoEcalPFClIsolation .push_back(0.f);
+      }
+    else
+      {
+	edm::Ptr<pat::Photon> patPhotonPtr(src->ptrAt(idxpho));
+	phoHcalPFClIsolation .push_back(patPhotonPtr->hcalPFClusterIso());
+	phoEcalPFClIsolation .push_back(patPhotonPtr->ecalPFClusterIso());
+      }
+
 
     // Zero the isolation sums
     float chargedIsoSum = 0;
@@ -378,12 +426,11 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
       if( thisCandidateType == reco::PFCandidate::h ){
 	// for charged hadrons, additionally check consistency
 	// with the PV
-	const reco::Track *theTrack = getTrackPointer( iCand, isAOD );
+	float dxy = -999, dz=-999;
+        getImpactParameters(iCand, isAOD, pv, dxy, dz);
 
-	float dxy = theTrack->dxy(pv.position());
+
 	if(fabs(dxy) > dxyMax) continue;
-
-	float dz  = theTrack->dz(pv.position());
 	if (fabs(dz) > dzMax) continue;
 
 	// The candidate is eligible, increment the isolaiton
@@ -406,9 +453,10 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
     float dRvetoBarrel = 0.0;
     float dRvetoEndcap = 0.0;
     float ptMin = 0.0;
+    bool isPVConstraint=false;
     float worstChargedIso =
       computeWorstPFChargedIsolation(iPho, pfCandidatesHandle, vertices, 
-				     isAOD, coneSizeDR, dxyMax, dzMax,
+				     isAOD, isPVConstraint,pv,coneSizeDR, dxyMax, dzMax,
 				     dRvetoBarrel, dRvetoEndcap, ptMin);
     phoWorstChargedIsolation .push_back( worstChargedIso );
 
@@ -419,9 +467,27 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
     ptMin = 0.1;
     float worstChargedIsoWithConeVeto =
       computeWorstPFChargedIsolation(iPho, pfCandidatesHandle, vertices, 
-				     isAOD, coneSizeDR, dxyMax, dzMax,
+				     isAOD, isPVConstraint,pv, coneSizeDR, dxyMax, dzMax,
 				     dRvetoBarrel, dRvetoEndcap, ptMin);
     phoWorstChargedIsolationWithConeVeto .push_back( worstChargedIsoWithConeVeto );
+
+    isPVConstraint=true;
+    float worstChargedIsoWithPVConstraint =
+      computeWorstPFChargedIsolation(iPho, pfCandidatesHandle, vertices, 
+				     isAOD, isPVConstraint,pv,coneSizeDR, dxyMax, dzMax,
+				     dRvetoBarrel, dRvetoEndcap, ptMin);
+    phoWorstChargedIsolationWithPVConstraint .push_back( worstChargedIsoWithPVConstraint );
+
+    // Worst isolation computed with cone vetos and a ptMin cut, as in 
+    // Run 2 Hgg code.
+    dRvetoBarrel = 0.02;
+    dRvetoEndcap = 0.02;
+    ptMin = 0.1;
+    float worstChargedIsoWithConeVetoWithPVConstraint =
+      computeWorstPFChargedIsolation(iPho, pfCandidatesHandle, vertices, 
+				     isAOD,isPVConstraint, pv, coneSizeDR, dxyMax, dzMax,
+				     dRvetoBarrel, dRvetoEndcap, ptMin);
+    phoWorstChargedIsolationWithConeVetoWithPVConstraint .push_back( worstChargedIsoWithConeVetoWithPVConstraint );
 
     
 
@@ -435,12 +501,19 @@ void PhotonIDValueMapProducer::produce(edm::Event& iEvent, const edm::EventSetup
   writeValueMap(iEvent, src, phoFull5x5E2x5Max, phoFull5x5E2x5Max_);  
   writeValueMap(iEvent, src, phoFull5x5E5x5   , phoFull5x5E5x5_);  
   writeValueMap(iEvent, src, phoESEffSigmaRR  , phoESEffSigmaRR_);  
-  // IsolationsOB
+  // Isolation
   writeValueMap(iEvent, src, phoChargedIsolation, phoChargedIsolation_);  
   writeValueMap(iEvent, src, phoNeutralHadronIsolation, phoNeutralHadronIsolation_);  
   writeValueMap(iEvent, src, phoPhotonIsolation, phoPhotonIsolation_);  
   writeValueMap(iEvent, src, phoWorstChargedIsolation, phoWorstChargedIsolation_);  
   writeValueMap(iEvent, src, phoWorstChargedIsolationWithConeVeto, phoWorstChargedIsolationWithConeVeto_);  
+  writeValueMap(iEvent, src, phoWorstChargedIsolationWithPVConstraint, phoWorstChargedIsolationWithPVConstraint_);  
+  writeValueMap(iEvent, src, phoWorstChargedIsolationWithConeVetoWithPVConstraint, phoWorstChargedIsolationWithConeVetoWithPVConstraint_);  
+  //PFCluster  Isolation
+  writeValueMap(iEvent, src, phoTrkIsolation, phoTrkIsolation_);  
+  writeValueMap(iEvent, src, phoHcalPFClIsolation, phoHcalPFClIsolation_);  
+  writeValueMap(iEvent, src, phoEcalPFClIsolation, phoEcalPFClIsolation_);  
+
 }
 
 void PhotonIDValueMapProducer::writeValueMap(edm::Event &iEvent,
@@ -471,7 +544,7 @@ template <class T, class U>
 float PhotonIDValueMapProducer
 ::computeWorstPFChargedIsolation(const T& photon, const U& pfCandidates,
 				 const edm::Handle<reco::VertexCollection> vertices,
-				 bool isAOD,
+				 bool isAOD, bool isPVConstraint,const reco::Vertex& pv,
 				 float dRmax, float dxyMax, float dzMax,
 				 float dRvetoBarrel, float dRvetoEndcap, float ptMin){
 
@@ -508,11 +581,13 @@ float PhotonIDValueMapProducer
       if (iCand->pt() < ptMin)
 	continue;
       
-      const reco::Track *theTrack = getTrackPointer( iCand, isAOD );
-      float dxy = theTrack->dxy(vtx->position());
+      float dxy=-999, dz=-999;
+      if(isPVConstraint) getImpactParameters(iCand, isAOD, pv, dxy, dz);
+      else getImpactParameters(iCand, isAOD, *vtx, dxy, dz);
+
+
+
       if( fabs(dxy) > dxyMax) continue;
-      
-      float dz = theTrack->dz(vtx->position());
       if ( fabs(dz) > dzMax) continue;
       
       float dR2 = deltaR2(photon_directionWrtVtx.Eta(), photon_directionWrtVtx.Phi(), 
@@ -525,11 +600,12 @@ float PhotonIDValueMapProducer
     allIsolations.push_back(sum);
   }
 
-  if( allIsolations.size()>0 )
+  if( !allIsolations.empty() )
     worstIsolation = * std::max_element( allIsolations.begin(), allIsolations.end() );
   
   return worstIsolation;
 }
+
 
 reco::PFCandidate::ParticleType
 PhotonIDValueMapProducer::candidatePdgId(const edm::Ptr<reco::Candidate> candidate, 
@@ -562,6 +638,25 @@ PhotonIDValueMapProducer::getTrackPointer(const edm::Ptr<reco::Candidate> candid
     theTrack = &( ((const patCandPtr) candidate)->pseudoTrack());
 
   return theTrack;
+}
+
+void PhotonIDValueMapProducer::getImpactParameters(const edm::Ptr<reco::Candidate>& candidate,
+                                                   bool isAOD, const reco::Vertex& pv,
+                                                   float &dxy, float &dz){
+
+  dxy=-999;
+  dz=-999;
+  if( isAOD ) {
+    const reco::Track *theTrack = &*( ((const recoCandPtr) candidate)->trackRef());
+    dxy = theTrack->dxy(pv.position());
+    dz  = theTrack->dz(pv.position());
+  } else {
+    const pat::PackedCandidate & aCand = *(patCandPtr(candidate)); 
+    dxy = aCand.dxy(pv.position());
+    dz = aCand.dz(pv.position());
+
+  }
+
 }
 
 DEFINE_FWK_MODULE(PhotonIDValueMapProducer);

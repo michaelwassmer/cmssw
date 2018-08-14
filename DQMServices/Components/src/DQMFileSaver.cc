@@ -236,7 +236,7 @@ DQMFileSaver::saveForOnline(int run, const std::string &suffix, const std::strin
     {
       dbe_->cd();
       std::vector<MonitorElement*> pNamesVector = dbe_->getMatchingContents("^" + systems[i] + "/.*/EventInfo/processName",lat::Regexp::Perl);
-      if (pNamesVector.size() > 0){
+      if (!pNamesVector.empty()){
         doSaveForOnline(dbe_, run, enableMultiThread_,
                         fileBaseName_ + systems[i] + suffix + child_ + ".root",
                         "", "^(Reference/)?([^/]+)", rewrite,
@@ -831,23 +831,4 @@ DQMFileSaver::endJob(void)
 	  << "Internal error.  Can only save files at the end of the"
 	  << " job in Offline mode.";
     }
-}
-
-void
-DQMFileSaver::postForkReacquireResources(unsigned int childIndex, unsigned int numberOfChildren)
-{
-  // this is copied from IOPool/Output/src/PoolOutputModule.cc, for consistency
-  unsigned int digits = 0;
-  while (numberOfChildren != 0) {
-    ++digits;
-    numberOfChildren /= 10;
-  }
-  // protect against zero numberOfChildren
-  if (digits == 0) {
-    digits = 3;
-  }
-
-  char buffer[digits + 2];
-  snprintf(buffer, digits + 2, "_%0*d", digits, childIndex);
-  child_ = std::string(buffer);
 }

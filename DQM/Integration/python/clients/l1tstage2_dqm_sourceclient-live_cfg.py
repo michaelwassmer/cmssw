@@ -1,7 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 
 from Configuration.StandardSequences.Eras import eras
-process = cms.Process("L1TStage2DQM", eras.Run2_2016)
+process = cms.Process("L1TStage2DQM", eras.Run2_2017)
 
 #--------------------------------------------------
 # Event Source and Condition
@@ -43,7 +43,8 @@ process.rawToDigiPath = cms.Path(process.RawToDigi)
 from HLTrigger.HLTfilters.hltHighLevel_cfi import hltHighLevel
 process.hltFatEventFilter = hltHighLevel.clone()
 process.hltFatEventFilter.throw = cms.bool(False)
-process.hltFatEventFilter.HLTPaths = cms.vstring('HLT_L1FatEvents_v*')
+# HLT_Physics now has the event % 107 filter as well as L1FatEvents
+process.hltFatEventFilter.HLTPaths = cms.vstring('HLT_L1FatEvents_v*', 'HLT_Physics_v*')
 
 # This can be used if HLT filter not available in a run
 process.selfFatEventFilter = cms.EDFilter("HLTL1NumberFilter",
@@ -82,6 +83,54 @@ process.l1tStage2MonitorClientPath = cms.Path(process.l1tStage2MonitorClient)
 
 #process.load("DQM.L1TMonitor.L1TMonitor_cff")
 #process.l1tMonitorEndPath = cms.EndPath(process.l1tMonitorEndPathSeq)
+
+#--------------------------------------------------
+# Customize for other type of runs
+
+# Cosmic run
+if (process.runType.getRunType() == process.runType.cosmic_run):
+    process.DQMStore.referenceFileName = "/dqmdata/dqm/reference/l1t_reference_cosmic.root"
+    # Remove Quality Tests for L1T Muon Subsystems since they are not optimized yet for cosmics
+    process.l1tStage2MonitorClient.remove(process.l1TStage2uGMTQualityTests)
+    process.l1tStage2MonitorClient.remove(process.l1TStage2EMTFQualityTests)
+    process.l1tStage2MonitorClient.remove(process.l1TStage2BMTFQualityTests)
+    process.l1tStage2EventInfoClient.DisableL1Systems = cms.vstring("EMTF", "OMTF", "BMTF", "uGMT")
+
+# Heavy-Ion run
+if (process.runType.getRunType() == process.runType.hi_run):
+    process.DQMStore.referenceFileName = "/dqmdata/dqm/reference/l1t_reference_hi.root"
+    process.castorDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.ctppsDiamondRawToDigi.rawDataTag = cms.InputTag("rawDataRepacker")
+    process.ctppsPixelDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.ecalDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.ecalPreshowerDigis.sourceTag = cms.InputTag("rawDataRepacker")
+    process.hcalDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.muonCSCDigis.InputObjects = cms.InputTag("rawDataRepacker")
+    process.muonDTDigis.inputLabel = cms.InputTag("rawDataRepacker")
+    process.muonRPCDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.scalersRawToDigi.scalersInputTag = cms.InputTag("rawDataRepacker")
+    process.siPixelDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.siStripDigis.ProductLabel = cms.InputTag("rawDataRepacker")
+    process.tcdsDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.tcdsRawToDigi.InputLabel = cms.InputTag("rawDataRepacker")
+    process.totemRPRawToDigi.rawDataTag = cms.InputTag("rawDataRepacker")
+    process.totemTriggerRawToDigi.rawDataTag = cms.InputTag("rawDataRepacker")
+    process.csctfDigis.producer = cms.InputTag("rawDataRepacker")
+    process.dttfDigis.DTTF_FED_Source = cms.InputTag("rawDataRepacker")
+    process.gctDigis.inputLabel = cms.InputTag("rawDataRepacker")
+    process.gtDigis.DaqGtInputTag = cms.InputTag("rawDataRepacker")
+    process.twinMuxStage2Digis.DTTM7_FED_Source = cms.InputTag("rawDataRepacker")
+    process.bmtfDigis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.emtfStage2Digis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.gmtStage2Digis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.l1tCaloLayer1Digis.fedRawDataLabel = cms.InputTag("rawDataRepacker")
+    process.caloStage1Digis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.caloStage2Digis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.gtStage2Digis.InputLabel = cms.InputTag("rawDataRepacker")
+    process.l1tStage2CaloLayer1.fedRawDataLabel = cms.InputTag("rawDataRepacker")
+    process.l1tStage2uGMTZeroSupp.rawData = cms.InputTag("rawDataRepacker")
+    process.l1tStage2uGMTZeroSuppFatEvts.rawData = cms.InputTag("rawDataRepacker")
+    process.selfFatEventFilter.rawInput = cms.InputTag("rawDataRepacker")
 
 #--------------------------------------------------
 # L1T Online DQM Schedule

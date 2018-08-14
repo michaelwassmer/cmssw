@@ -41,8 +41,8 @@ l1t::L1TGlobalUtil::L1TGlobalUtil(){
     m_PreScaleColumn = 0;
     m_readPrescalesFromFile = false;
 
-    m_prescaleFactorsAlgoTrig = 0ULL;
-    m_triggerMaskAlgoTrig = 0ULL;
+    m_prescaleFactorsAlgoTrig = nullptr;
+    m_triggerMaskAlgoTrig = nullptr;
 }
 
 l1t::L1TGlobalUtil::L1TGlobalUtil(edm::ParameterSet const& pset,
@@ -115,6 +115,9 @@ void l1t::L1TGlobalUtil::retrieveL1Setup(const edm::EventSetup& evSetup) {
 	// clear and dimension
 	resetPrescaleVectors();
 	resetMaskVectors();
+	m_PreScaleColumn = 0;
+	m_numberOfPreScaleColumns = 0;
+	m_numberPhysTriggers = 0;
 
 	edm::ESHandle< L1TGlobalPrescalesVetos > l1GtPrescalesVetoes;
 	evSetup.get< L1TGlobalPrescalesVetosRcd >().get( l1GtPrescalesVetoes );
@@ -122,6 +125,7 @@ void l1t::L1TGlobalUtil::retrieveL1Setup(const edm::EventSetup& evSetup) {
 	m_l1GtPrescalesVetoes = PrescalesVetosHelper::readFromEventSetup(es);
 
 	m_prescaleFactorsAlgoTrig = &(m_l1GtPrescalesVetoes->prescaleTable());
+	m_numberOfPreScaleColumns = m_prescaleFactorsAlgoTrig->size();
 	m_numberPhysTriggers = (*m_prescaleFactorsAlgoTrig)[0].size(); // assumes all prescale columns are the same length
 
 	m_triggerMaskAlgoTrig   = &(m_l1GtPrescalesVetoes->triggerAlgoBxMask());
@@ -145,7 +149,7 @@ void l1t::L1TGlobalUtil::retrieveL1Setup(const edm::EventSetup& evSetup) {
     }
 
     //Protect against poor prescale column choice (I don't think there is a way this happen as currently structured)
-    if(m_PreScaleColumn > m_prescaleFactorsAlgoTrig->size() || m_PreScaleColumn < 1) {
+    if(m_PreScaleColumn > m_prescaleFactorsAlgoTrig->size()) {
       LogTrace("l1t|Global")
 	<< "\nNo Prescale Set: " << m_PreScaleColumn
 	<< "\nMax Prescale Set value : " << m_prescaleFactorsAlgoTrig->size()
@@ -186,7 +190,7 @@ void l1t::L1TGlobalUtil::retrieveL1Setup(const edm::EventSetup& evSetup) {
 	  it++;
 	}
 
-      if (maskedBxs.size()>0){
+      if (!maskedBxs.empty()){
 	LogDebug("l1t|Global") << "i Algo: "<< algBit << "\t" << algName << " masked\n";
 	for ( unsigned int ibx=0; ibx< maskedBxs.size(); ibx++){
 	  // std::cout << "\t" << maskedBxs.at(ibx);
@@ -215,6 +219,22 @@ void l1t::L1TGlobalUtil::retrieveL1Event(const edm::Event& iEvent, const edm::Ev
        if (algBlk != m_uGtAlgBlk->end(0)){
 	 if (! m_readPrescalesFromFile){
 	   m_PreScaleColumn = static_cast<unsigned int>(algBlk->getPreScColumn());
+
+	   // Fix for MC prescale column being set to index+1 in early versions of uGT emulator
+	   if (iEvent.run() == 1){
+	     if (m_prescaleFactorsAlgoTrig->size() == 1 && m_PreScaleColumn ==1) m_PreScaleColumn = 0;
+	   }
+
+	   // add protection against out-of-bound index for prescale column
+	   if(m_PreScaleColumn >= m_prescaleFactorsAlgoTrig->size()) {
+	     LogDebug("l1t|Global")
+	       << "Prescale column extracted from GlobalAlgBlk too large: " << m_PreScaleColumn
+	       << "\tMaximum value allowed: " << m_prescaleFactorsAlgoTrig->size()-1
+	       << "\tResetting prescale column to 0"
+	       << std::endl;
+	     m_PreScaleColumn = 0;
+	   }
+
 	 }
 	 const std::vector<int>& prescaleSet = (*m_prescaleFactorsAlgoTrig)[m_PreScaleColumn];
 
@@ -243,35 +263,6 @@ void l1t::L1TGlobalUtil::retrieveL1Event(const edm::Event& iEvent, const edm::Ev
 
 	   (m_prescales[algBit]).first  = algName;
 	   (m_prescales[algBit]).second = prescaleSet[algBit];
-
-	   LogDebug("l1t|Global") << "Number of bunch crossings stored: " <<  (*m_triggerMaskAlgoTrig).size() << endl;
-
-	   const std::map<int, std::vector<int> >* triggerAlgoMaskAlgoTrig = m_triggerMaskAlgoTrig;
-	   std::map<int, std::vector<int> >::const_iterator it=triggerAlgoMaskAlgoTrig->begin();
-
-	   std::vector<int> maskedBxs;
-	   (m_masks[algBit]).first  = algName;
-	   (m_masks[algBit]).second = maskedBxs;
-
-	   while(it != triggerAlgoMaskAlgoTrig->end())
-	     {
-	       std::vector<int> masks = it->second;
-	       //std::cout<< "BX: " << it->first<<" VecSize: "<< masks.size();
-	       //std::cout << "\tMasked algos: ";
-	       for ( unsigned int imask=0; imask< masks.size(); imask++){
-		 if (masks.at(imask) == algBit) maskedBxs.push_back(it->first);
-		 // std::cout << "\t" << masks.at(imask);
-	       }
-	       it++;
-	     }
-
-	   if (maskedBxs.size()>0){
-	     LogDebug("l1t|Global") << "Algo: "<< algBit << "\t" << algName << " masked\n";
-	     for ( unsigned int ibx=0; ibx< maskedBxs.size(); ibx++){
-	       // std::cout << "\t" << maskedBxs.at(ibx);
-	       (m_masks[algBit]).second = maskedBxs;
-	     }
-	   }
 	 }
        } else {
 	 //cout << "Error empty AlgBlk recovered.\n";
@@ -329,7 +320,7 @@ void l1t::L1TGlobalUtil::loadPrescalesAndMasks() {
 
       int NumPrescaleSets = 0;
       for( int iCol=0; iCol<int(vec.size()); iCol++ ){
-	if( vec[iCol].size() > 0 ){
+	if( !vec[iCol].empty() ){
 	  int firstRow = vec[iCol][0];
 
 	  if( firstRow >= 0 ) NumPrescaleSets++;
@@ -356,7 +347,7 @@ void l1t::L1TGlobalUtil::loadPrescalesAndMasks() {
 	  if( algoBit < m_numberPhysTriggers ){
 	    for( int iSet=0; iSet<int(vec.size()); iSet++ ){
 	      int useSet = -1;
-	      if( vec[iSet].size() > 0 ){
+	      if( !vec[iSet].empty() ){
 		useSet = vec[iSet][0];
 	      }
 	      useSet -= 1;
