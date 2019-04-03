@@ -25,12 +25,13 @@ def miniAOD_customizeCommon(process):
     process.patMuons.puppiNoLeptonsIsolationNeutralHadrons = cms.InputTag("muonPUPPINoLeptonsIsolation","h0-DR040-ThresholdVeto000-ConeVeto001")
     process.patMuons.puppiNoLeptonsIsolationPhotons        = cms.InputTag("muonPUPPINoLeptonsIsolation","gamma-DR040-ThresholdVeto000-ConeVeto001")
 
-    process.patMuons.computeMiniIso = cms.bool(True)
-    process.patMuons.computeMuonMVA = cms.bool(True)
-    process.patMuons.computeSoftMuonMVA = cms.bool(True)
+    process.patMuons.computeMiniIso = True
+    process.patMuons.computeMuonMVA = True
+    process.patMuons.computeSoftMuonMVA = True
 
     process.patMuons.addTriggerMatching = True
 
+    process.patMuons.computePuppiCombinedIso = True
     #
     # disable embedding of electron and photon associated objects already stored by the ReducedEGProducer
     process.patElectrons.embedGsfElectronCore = False  ## process.patElectrons.embed in AOD externally stored gsf electron core
@@ -293,11 +294,7 @@ def miniAOD_customizeCommon(process):
     switchOnVIDElectronIdProducer(process,DataFormat.MiniAOD, task)
     process.egmGsfElectronIDs.physicsObjectSrc = \
         cms.InputTag("reducedEgamma","reducedGedGsfElectrons")
-    process.electronMVAVariableHelper.src = \
-        cms.InputTag('reducedEgamma','reducedGedGsfElectrons')
     process.electronMVAValueMapProducer.src = \
-        cms.InputTag('reducedEgamma','reducedGedGsfElectrons')
-    process.electronRegressionValueMapProducer.src = \
         cms.InputTag('reducedEgamma','reducedGedGsfElectrons')
     for idmod in electron_ids:
         setupAllVIDIdsInModule(process,idmod,setupVIDElectronSelection,None,False,task)
@@ -318,8 +315,10 @@ def miniAOD_customizeCommon(process):
     #VID Photon IDs
     process.patPhotons.addPhotonID = cms.bool(True)
     photon_ids = ['RecoEgamma.PhotonIdentification.Identification.cutBasedPhotonID_Fall17_94X_V1_TrueVtx_cff',
+                  'RecoEgamma.PhotonIdentification.Identification.cutBasedPhotonID_Fall17_94X_V2_cff',
                   'RecoEgamma.PhotonIdentification.Identification.mvaPhotonID_Fall17_94X_V1_cff', 
                   'RecoEgamma.PhotonIdentification.Identification.mvaPhotonID_Fall17_94X_V1p1_cff', 
+                  'RecoEgamma.PhotonIdentification.Identification.mvaPhotonID_Fall17_94X_V2_cff',
                   'RecoEgamma.PhotonIdentification.Identification.cutBasedPhotonID_Spring16_V2p2_cff',
                   'RecoEgamma.PhotonIdentification.Identification.mvaPhotonID_Spring16_nonTrig_V1_cff']
     switchOnVIDPhotonIdProducer(process,DataFormat.AOD, task) 
@@ -331,8 +330,6 @@ def miniAOD_customizeCommon(process):
     process.egmPhotonIDs.physicsObjectSrc = \
         cms.InputTag("reducedEgamma","reducedGedPhotons")
     process.photonIDValueMapProducer.src = \
-        cms.InputTag("reducedEgamma","reducedGedPhotons")
-    process.photonRegressionValueMapProducer.src = \
         cms.InputTag("reducedEgamma","reducedGedPhotons")
     process.photonIDValueMapProducer.particleBasedIsolation = \
         cms.InputTag("reducedEgamma","reducedPhotonPfCandMap")
@@ -357,11 +354,12 @@ def miniAOD_customizeCommon(process):
     run2_miniAOD_94XFall17.toReplaceWith(
         process.makePatTausTask, _makePatTausTaskWithRetrainedMVATauID
         )
-    #-- Adding customization for 80X 2016 legacy reMiniAOD
+    #-- Adding customization for 80X 2016 legacy reMiniAOD and 2018 heavy ions
     from Configuration.Eras.Modifier_run2_miniAOD_80XLegacy_cff import run2_miniAOD_80XLegacy
+    from Configuration.Eras.Modifier_pp_on_AA_2018_cff import pp_on_AA_2018
     _makePatTausTaskWithTauReReco = process.makePatTausTask.copy()
     _makePatTausTaskWithTauReReco.add(process.PFTauTask)
-    run2_miniAOD_80XLegacy.toReplaceWith(
+    (run2_miniAOD_80XLegacy | pp_on_AA_2018).toReplaceWith(
         process.makePatTausTask, _makePatTausTaskWithTauReReco
         )
     
@@ -515,8 +513,10 @@ def miniAOD_customizeData(process):
     from PhysicsTools.PatAlgos.tools.coreTools import runOnData
     runOnData( process, outputModules = [] )
     process.load("RecoCTPPS.TotemRPLocal.ctppsLocalTrackLiteProducer_cff")
+    process.load("RecoCTPPS.ProtonReconstruction.ctppsProtons_cff")
     task = getPatAlgosToolsTask(process)
     task.add(process.ctppsLocalTrackLiteProducer)
+    task.add(process.ctppsProtons)
 
 def miniAOD_customizeAllData(process):
     miniAOD_customizeCommon(process)

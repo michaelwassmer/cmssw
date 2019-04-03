@@ -5,6 +5,7 @@ from RecoLuminosity.LumiProducer.bunchSpacingProducer_cfi import *
 from RecoLocalMuon.Configuration.RecoLocalMuon_cff import *
 from RecoLocalCalo.Configuration.RecoLocalCalo_cff import *
 from RecoLocalFastTime.Configuration.RecoLocalFastTime_cff import *
+from RecoMTD.Configuration.RecoMTD_cff import *
 from RecoTracker.Configuration.RecoTracker_cff import *
 from RecoParticleFlow.PFClusterProducer.particleFlowCluster_cff import *
 from TrackingTools.Configuration.TrackingTools_cff import *
@@ -50,6 +51,14 @@ from RecoLocalCalo.CastorReco.CastorSimpleReconstructor_cfi import *
 # Cosmic During Collisions
 from RecoTracker.SpecialSeedGenerators.cosmicDC_cff import *
 
+# Low pT electrons
+from RecoEgamma.EgammaElectronProducers.lowPtGsfElectronSequence_cff import *
+
+# Conversions from lowPtGsfTracks
+from RecoEgamma.EgammaPhotonProducers.conversionOpenTrackSequence_cff import *
+from RecoEgamma.EgammaPhotonProducers.gsfTracksOpenConversionSequence_cff import *
+
+
 localreco = cms.Sequence(bunchSpacingProducer+trackerlocalreco+muonlocalreco+calolocalreco+castorreco)
 localreco_HcalNZS = cms.Sequence(bunchSpacingProducer+trackerlocalreco+muonlocalreco+calolocalrecoNZS+castorreco)
 
@@ -81,7 +90,8 @@ ctpps_2016.toReplaceWith(localreco_HcalNZS, _ctpps_2016_localreco_HcalNZS)
 ###########################################
 _fastSim_localreco = localreco.copyAndExclude([
     castorreco,
-    totemRPLocalReconstruction,totemTimingLocalReconstruction,ctppsDiamondLocalReconstruction,ctppsLocalTrackLiteProducer,ctppsPixelLocalReconstruction,
+    totemRPLocalReconstruction,totemTimingLocalReconstruction,ctppsDiamondLocalReconstruction,
+      ctppsLocalTrackLiteProducer,ctppsPixelLocalReconstruction,ctppsProtons,
     trackerlocalreco
 ])
 fastSim.toReplaceWith(localreco, _fastSim_localreco)
@@ -124,6 +134,12 @@ globalreco = cms.Sequence(globalreco_tracking*
 _run3_globalreco = globalreco.copyAndExclude([CastorFullReco])
 run3_common.toReplaceWith(globalreco, _run3_globalreco)
 
+_phase2_timing_layer_globalreco = _run3_globalreco.copy()
+_phase2_timing_layer_globalreco += fastTimingGlobalReco
+from Configuration.Eras.Modifier_phase2_timing_layer_tile_cff import phase2_timing_layer_tile
+from Configuration.Eras.Modifier_phase2_timing_layer_bar_cff import phase2_timing_layer_bar
+(phase2_timing_layer_tile | phase2_timing_layer_bar).toReplaceWith(globalreco,_phase2_timing_layer_globalreco)
+
 _fastSim_globalreco = globalreco.copyAndExclude([CastorFullReco,muoncosmicreco])
 # insert the few tracking modules to be run after mixing back in the globalreco sequence
 _fastSim_globalreco.insert(0,newCombinedSeeds+trackExtrapolator+caloTowerForTrk+firstStepPrimaryVerticesUnsorted+ak4CaloJetsForTrk+initialStepTrackRefsForJets+firstStepPrimaryVertices)
@@ -146,18 +162,24 @@ highlevelreco = cms.Sequence(egammaHighLevelRecoPrePF*
                              recoPFMET*
                              PFTau*
                              reducedRecHits*
-                             cosmicDCTracksSeq
+                             cosmicDCTracksSeq*
+                             lowPtGsfElectronSequence*
+                             conversionOpenTrackSequence*
+                             gsfTracksOpenConversionSequence 
                              )
 
 # AA data with pp reco
 from Configuration.Eras.Modifier_pp_on_XeXe_2017_cff import pp_on_XeXe_2017
 from Configuration.Eras.Modifier_pp_on_AA_2018_cff import pp_on_AA_2018
+from RecoHI.HiTracking.HILowPtConformalPixelTracks_cfi import *
 from RecoHI.HiCentralityAlgos.HiCentrality_cfi import hiCentrality
 from RecoHI.HiCentralityAlgos.HiClusterCompatibility_cfi import hiClusterCompatibility
 _highlevelreco_HI = highlevelreco.copy()
+_highlevelreco_HI += hiConformalPixelTracksSequencePhase1
 _highlevelreco_HI += hiCentrality
 _highlevelreco_HI += hiClusterCompatibility
 (pp_on_XeXe_2017 | pp_on_AA_2018).toReplaceWith(highlevelreco, _highlevelreco_HI)
+pp_on_AA_2018.toReplaceWith(highlevelreco,highlevelreco.copyAndExclude([PFTau]))
 
 # not commisoned and not relevant in FastSim (?):
 _fastSim_highlevelreco = highlevelreco.copyAndExclude([cosmicDCTracksSeq,muoncosmichighlevelreco])

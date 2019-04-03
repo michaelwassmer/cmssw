@@ -60,8 +60,8 @@
 
 namespace AlCaIsoTracks {
   struct Counters {
-    Counters() : nAll_(0), nGood_(0), nRange_(0) {}
-    mutable std::atomic<unsigned int> nAll_, nGood_, nRange_;
+    Counters() : nAll_(0), nGood_(0), nRange_(0), nHigh_(0) {}
+    mutable std::atomic<unsigned int> nAll_, nGood_, nRange_, nHigh_;
   };
 }
 
@@ -95,12 +95,13 @@ private:
   const double                   eIsolate_;
   const double                   hitEthrEB_, hitEthrEE0_, hitEthrEE1_;
   const double                   hitEthrEE2_, hitEthrEE3_;
-  const double                   pTrackLow_, pTrackHigh_;
-  const int                      preScale_;
+  const double                   hitEthrEELo_, hitEthrEEHi_;
+  const double                   pTrackLow_, pTrackHigh_, pTrackH_;
+  const int                      preScale_, preScaleH_;
   const std::string              theTrackQuality_;
   spr::trackSelectionParameters  selectionParameter_;
   double                         a_charIsoR_;
-  unsigned int                   nRun_, nAll_, nGood_, nRange_;
+  unsigned int                   nRun_, nAll_, nGood_, nRange_, nHigh_;
   edm::EDGetTokenT<trigger::TriggerEvent>  tok_trigEvt_;
   edm::EDGetTokenT<edm::TriggerResults>    tok_trigRes_;
   edm::EDGetTokenT<reco::TrackCollection>  tok_genTrack_;
@@ -144,11 +145,15 @@ AlCaIsoTracksFilter::AlCaIsoTracksFilter(const edm::ParameterSet& iConfig, const
   hitEthrEE1_(iConfig.getParameter<double>("EEHitEnergyThreshold1") ),
   hitEthrEE2_(iConfig.getParameter<double>("EEHitEnergyThreshold2") ),
   hitEthrEE3_(iConfig.getParameter<double>("EEHitEnergyThreshold3") ),
+  hitEthrEELo_(iConfig.getParameter<double>("EEHitEnergyThresholdLow") ),
+  hitEthrEEHi_(iConfig.getParameter<double>("EEHitEnergyThresholdHigh") ),
   pTrackLow_(iConfig.getParameter<double>("momentumRangeLow")),
   pTrackHigh_(iConfig.getParameter<double>("momentumRangeHigh")),
+  pTrackH_(iConfig.getParameter<double>("momentumHigh")),
   preScale_(iConfig.getParameter<int>("preScaleFactor")),
+  preScaleH_(iConfig.getParameter<int>("preScaleHigh")),
   theTrackQuality_(iConfig.getParameter<std::string>("trackQuality")),
-  nRun_(0), nAll_(0), nGood_(0), nRange_(0) {
+  nRun_(0), nAll_(0), nGood_(0), nRange_(0), nHigh_(0) {
   //now do what ever initialization is needed
   const double isolationRadius(28.9);
   // Different isolation cuts are described in DN-2016/029
@@ -200,7 +205,13 @@ AlCaIsoTracksFilter::AlCaIsoTracksFilter(const edm::ParameterSet& iConfig, const
 			       <<"\t eIsolate_ "       << eIsolate_ << "\n"
 			       <<"\t Precale factor "  << preScale_
 			       <<"\t in momentum range " << pTrackLow_
-			       <<":" << pTrackHigh_;
+			       <<":" << pTrackHigh_ << " and prescale factor "
+			       << preScaleH_ << " for p > " << pTrackH_
+			       <<" Threshold for EB " <<  hitEthrEB_ << " EE "
+			       << hitEthrEE0_ << ":" << hitEthrEE1_ << ":"
+			       << hitEthrEE2_ << ":" << hitEthrEE3_ << ":"
+			       << hitEthrEELo_ << ":" << hitEthrEEHi_;
+
   for (unsigned int k=0; k<trigNames_.size(); ++k)
     edm::LogInfo("HcalIsoTrack") << "Trigger[" << k << "] " << trigNames_[k];
 } // AlCaIsoTracksFilter::AlCaIsoTracksFilter  constructor
@@ -278,7 +289,6 @@ bool AlCaIsoTracksFilter::filter(edm::Event& iEvent, edm::EventSetup const& iSet
       edm::LogWarning("HcalIsoTrack") << "Cannot access the collection " << labelGenTrack_;
       foundCollections = false;
     }
-    reco::TrackCollection::const_iterator trkItr;
 
     //Define the best vertex and the beamspot
     edm::Handle<reco::VertexCollection> recVtxs;
@@ -323,7 +333,7 @@ bool AlCaIsoTracksFilter::filter(edm::Event& iEvent, edm::EventSetup const& iSet
 			 trkCaloDirections, false);
 
       std::vector<spr::propagatedTrackDirection>::const_iterator trkDetItr;
-      unsigned int nTracks(0), nselTracks(0), ntrin(0), ntrout(0);
+      unsigned int nTracks(0), nselTracks(0), ntrin(0), ntrout(0), ntrH(0);
       for (trkDetItr = trkCaloDirections.begin(),nTracks=0; 
 	   trkDetItr != trkCaloDirections.end(); trkDetItr++,nTracks++) {
 	const reco::Track* pTrack = &(*(trkDetItr->trkItr));
@@ -361,8 +371,13 @@ bool AlCaIsoTracksFilter::filter(edm::Event& iEvent, edm::EventSetup const& iSet
 	  for (unsigned int k=0; k<eIds.size(); ++k) {
 	    const GlobalPoint& pos = geo->getPosition(eIds[k]);
 	    double eta  = std::abs(pos.eta());
-	    double eThr = (eIds[k].subdetId() == EcalBarrel) ? hitEthrEB_ :
-	      (((eta*hitEthrEE3_+hitEthrEE2_)*eta+hitEthrEE1_)*eta+hitEthrEE0_);
+	    double eThr(hitEthrEB_);
+	    if (eIds[k].subdetId() != EcalBarrel) {
+	      eThr = (((eta*hitEthrEE3_+hitEthrEE2_)*eta+hitEthrEE1_)*eta+
+		      hitEthrEE0_);
+	      if      (eThr < hitEthrEELo_) eThr = hitEthrEELo_;
+	      else if (eThr > hitEthrEEHi_) eThr = hitEthrEEHi_;
+	    }
 	    if (eHit[k] > eThr) eMipDR += eHit[k];
 	  }
 	  double hmaxNearP = spr::chargeIsolationCone(nTracks,
@@ -381,6 +396,7 @@ bool AlCaIsoTracksFilter::filter(edm::Event& iEvent, edm::EventSetup const& iSet
 					   << ":" << eIsolation;
 	  if (t_p>pTrackMin_ && eMipDR<eEcalMax_ && hmaxNearP<eIsolation) {
 	    if (t_p > pTrackLow_ && t_p < pTrackHigh_) ntrin++;
+	    else if (t_p > pTrackH_)                   ntrH++;
 	    else                                       ntrout++;
 	  }
 	}
@@ -390,6 +406,11 @@ bool AlCaIsoTracksFilter::filter(edm::Event& iEvent, edm::EventSetup const& iSet
 	++nRange_;
 	if      (preScale_ <= 1)         accept = true;
 	else if (nRange_%preScale_ == 1) accept = true;
+      }
+      if (!accept && ntrH > 0) {
+	++nHigh_;
+	if      (preScaleH_ <= 1)        accept = true;
+	else if (nHigh_%preScaleH_ == 1) accept = true;
       }
     }
   }
@@ -404,12 +425,14 @@ void AlCaIsoTracksFilter::endStream() {
   globalCache()->nAll_   += nAll_;
   globalCache()->nGood_  += nGood_;
   globalCache()->nRange_ += nRange_;
+  globalCache()->nHigh_  += nHigh_;
 }
 
 void AlCaIsoTracksFilter::globalEndJob(const AlCaIsoTracks::Counters* count) {
   edm::LogVerbatim("HcalIsoTrack") << "Selects " << count->nGood_ << " in " 
 				   << count->nAll_ << " events and with "
-				   << count->nRange_ << " events in the p-range";
+				   << count->nRange_ << " events in the p-range"
+				   << count->nHigh_ << " events with high p";
 }
 
 
@@ -456,21 +479,25 @@ void AlCaIsoTracksFilter::fillDescriptions(edm::ConfigurationDescriptions& descr
   desc.add<double>("minimumTrackP",20.0);
   // signal zone in ECAL and MIP energy cutoff
   desc.add<double>("coneRadiusMIP",14.0);
-  desc.add<double>("maximumEcalEnergy",2.0);
+  desc.add<double>("maximumEcalEnergy",100.0);
   // following 3 parameters are for isolation cuts and described in the code
   desc.add<double>("maxTrackP",8.0);
   desc.add<double>("slopeTrackP",0.05090504066);
   desc.add<double>("isolationEnergy",10.0);
   // energy thershold for ECAL (from Egamma group)
-  desc.add<double>("EBHitEnergyThreshold",0.10);
-  desc.add<double>("EEHitEnergyThreshold0",-41.0664);
-  desc.add<double>("EEHitEnergyThreshold1",68.7950);
-  desc.add<double>("EEHitEnergyThreshold2",-38.1483);
-  desc.add<double>("EEHitEnergyThreshold3",7.04303);
+  desc.add<double>("EBHitEnergyThreshold",0.08);
+  desc.add<double>("EEHitEnergyThreshold0",0.30);
+  desc.add<double>("EEHitEnergyThreshold1",0.00);
+  desc.add<double>("EEHitEnergyThreshold2",0.00);
+  desc.add<double>("EEHitEnergyThreshold3",0.00);
+  desc.add<double>("EEHitEnergyThresholdLow",0.30);
+  desc.add<double>("EEHitEnergyThresholdHigh",0.30);
   // Prescale events only containing isolated tracks in the range
   desc.add<double>("momentumRangeLow",20.0);
   desc.add<double>("momentumRangeHigh",40.0);
-  desc.add<int>("preScaleFactor",2);
+  desc.add<int>("preScaleFactor",10);
+  desc.add<double>("momentumHigh",60.0);
+  desc.add<int>("preScaleHigh",2);
   descriptions.add("alcaIsoTracksFilter",desc);
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python 
 from __future__ import print_function
+from __future__ import absolute_import
 from sys import stderr, exit
 import commands
 
@@ -26,15 +27,15 @@ def getPrescalesFromKey(key):
     psMap = {}
     aa=""
     if len(res)>0:
-	for uu in range(3,len(res_split)-1):
-		if uu % 2 == 1:
-		   aa = aa + res_split[uu] + "\t"
-	psMap[path] = aa
+        for uu in range(3,len(res_split)-1):
+            if uu % 2 == 1:
+                aa = aa + res_split[uu] + "\t"
+        psMap[path] = aa
     else:
-	psMap[path] = 0
+        psMap[path] = 0
     return psMap
 
-from queryRR import queryRR
+from .queryRR import queryRR
 
 runKeys = queryRR(options.firstRun,options.lastRun,options.groupName)
 prescaleTable = {}

@@ -61,18 +61,14 @@ using namespace std;
 PATMuonHeavyObjectCache::PATMuonHeavyObjectCache(const edm::ParameterSet& iConfig) {
 
   if (iConfig.getParameter<bool>("computeMuonMVA")) {
-    std::string mvaTrainingFile = iConfig.getParameter<std::string>("mvaTrainingFile");
-    // xml training file
-    edm::FileInPath fip(mvaTrainingFile);
+    edm::FileInPath mvaTrainingFile = iConfig.getParameter<edm::FileInPath>("mvaTrainingFile");
     float mvaDrMax = iConfig.getParameter<double>("mvaDrMax");
-    muonMvaEstimator_ = std::make_unique<MuonMvaEstimator>(fip.fullPath(), mvaDrMax);
+    muonMvaEstimator_ = std::make_unique<MuonMvaEstimator>(mvaTrainingFile, mvaDrMax);
   }
 
   if (iConfig.getParameter<bool>("computeSoftMuonMVA")) {
-    std::string softMvaTrainingFile = iConfig.getParameter<std::string>("softMvaTrainingFile");
-    // xml soft mva training file
-    edm::FileInPath softfip(softMvaTrainingFile);
-    softMuonMvaEstimator_ = std::make_unique<SoftMuonMvaEstimator>(softfip.fullPath());
+    edm::FileInPath softMvaTrainingFile = iConfig.getParameter<edm::FileInPath>("softMvaTrainingFile");
+    softMuonMvaEstimator_ = std::make_unique<SoftMuonMvaEstimator>(softMvaTrainingFile);
   }
 }
 
@@ -158,11 +154,13 @@ PATMuonProducer::PATMuonProducer(const edm::ParameterSet & iConfig, PATMuonHeavy
   //for mini-isolation calculation
   computeMiniIso_ = iConfig.getParameter<bool>("computeMiniIso");
 
+  computePuppiCombinedIso_ = iConfig.getParameter<bool>("computePuppiCombinedIso");
+
   miniIsoParams_ = iConfig.getParameter<std::vector<double> >("miniIsoParams");
   if(computeMiniIso_ && miniIsoParams_.size() != 9){
       throw cms::Exception("ParameterError") << "miniIsoParams must have exactly 9 elements.\n";
   }
-  if(computeMiniIso_)
+  if(computeMiniIso_ || computePuppiCombinedIso_)
       pcToken_ = consumes<pat::PackedCandidateCollection >(iConfig.getParameter<edm::InputTag>("pfCandsForMiniIso"));
 
   // standard selectors
@@ -306,7 +304,7 @@ void PATMuonProducer::produce(edm::Event & iEvent, const edm::EventSetup & iSetu
 
   
   edm::Handle<pat::PackedCandidateCollection> pc;
-  if(computeMiniIso_)
+  if(computeMiniIso_ || computePuppiCombinedIso_)
       iEvent.getByToken(pcToken_, pc);
 
   // get the ESHandle for the transient track builder,
@@ -649,17 +647,29 @@ void PATMuonProducer::produce(edm::Event & iEvent, const edm::EventSetup & iSetu
     if (recomputeBasicSelectors_){
       muon.setSelectors(0);
       bool isRun2016BCDEF = (272728 <= iEvent.run() && iEvent.run() <= 278808);
-      muon::setCutBasedSelectorFlags(muon, pv, isRun2016BCDEF);
+      muon.setSelectors(muon::makeSelectorBitset(muon, pv, isRun2016BCDEF));
     }
     double miniIsoValue = -1;
     if (computeMiniIso_){
       // MiniIsolation working points
-      double miniIsoValue = getRelMiniIsoPUCorrected(muon,*rho);
+
+      miniIsoValue = getRelMiniIsoPUCorrected(muon,*rho);
+
       muon.setSelector(reco::Muon::MiniIsoLoose,     miniIsoValue<0.40);
       muon.setSelector(reco::Muon::MiniIsoMedium,    miniIsoValue<0.20);
       muon.setSelector(reco::Muon::MiniIsoTight,     miniIsoValue<0.10);
       muon.setSelector(reco::Muon::MiniIsoVeryTight, miniIsoValue<0.05);
     }
+
+    double puppiCombinedIsolationPAT = -1;
+    if(computePuppiCombinedIso_){
+
+      puppiCombinedIsolationPAT=puppiCombinedIsolation(muon, pc.product());
+      muon.setSelector(reco::Muon::PuppiIsoLoose, puppiCombinedIsolationPAT<0.27);
+      muon.setSelector(reco::Muon::PuppiIsoMedium, puppiCombinedIsolationPAT<0.22);
+      muon.setSelector(reco::Muon::PuppiIsoTight, puppiCombinedIsolationPAT<0.12);
+    }
+
     float jetPtRatio = 0.0;
     float jetPtRel = 0.0;
     float mva = 0.0;
@@ -685,6 +695,8 @@ void PATMuonProducer::produce(edm::Event & iEvent, const edm::EventSetup & iSetu
 
       // multi-isolation
       if (computeMiniIso_){
+
+
 	muon.setSelector(reco::Muon::MultiIsoLoose,  miniIsoValue<0.40 && (muon.jetPtRatio() > 0.80 || muon.jetPtRel() > 7.2) );
 	muon.setSelector(reco::Muon::MultiIsoMedium, miniIsoValue<0.16 && (muon.jetPtRatio() > 0.76 || muon.jetPtRel() > 7.2) );
       }
@@ -819,6 +831,69 @@ double PATMuonProducer::getRelMiniIsoPUCorrected(const pat::Muon& muon, float rh
   return pat::muonRelMiniIsoPUCorrected(muon.miniPFIsolation(), muon.p4(), drcut, rho);
 }
 
+
+double PATMuonProducer::puppiCombinedIsolation(const pat::Muon& muon, const pat::PackedCandidateCollection *pc)
+{
+  double dR_threshold = 0.4;
+  double dR2_threshold = dR_threshold * dR_threshold;
+  double mix_fraction = 0.5;
+  enum particleType{
+      CH = 0,
+      NH = 1,
+      PH = 2,
+      OTHER = 100000
+    };
+  double val_PuppiWithLep = 0.0;
+  double val_PuppiWithoutLep = 0.0;  
+
+  for(const auto & cand : *pc){//pat::pat::PackedCandidate loop start
+
+     const particleType pType =
+        isChargedHadron( cand.pdgId() ) ? CH :
+        isNeutralHadron( cand.pdgId() ) ? NH :
+        isPhoton( cand.pdgId() ) ? PH : OTHER;
+     if( pType == OTHER ){
+        if( cand.pdgId() != 1 && cand.pdgId() != 2
+        && abs( cand.pdgId() ) != 11
+        && abs( cand.pdgId() ) != 13){
+        LogTrace("PATMuonProducer") <<"candidate with PDGID = " << cand.pdgId() << " is not CH/NH/PH/e/mu or 1/2 (and this is removed from isolation calculation)" << std::endl;
+       }
+       continue;
+     }
+     double d_eta = std::abs( cand.eta() - muon.eta() );
+     if( d_eta > dR_threshold ) continue;
+
+     double d_phi = std::abs(reco::deltaPhi(cand.phi(),muon.phi()));
+     if( d_phi > dR_threshold ) continue ;
+
+     double dR2=reco::deltaR2(cand, muon);
+     if( dR2  > dR2_threshold ) continue;
+     if( pType == CH && dR2 < 0.0001*0.0001 ) continue;
+     if( pType == NH && dR2 < 0.01  *0.01   ) continue;
+     if( pType == PH && dR2 < 0.01  *0.01   ) continue;
+     val_PuppiWithLep += cand.pt() * cand.puppiWeight();
+     val_PuppiWithoutLep += cand.pt() * cand.puppiWeightNoLep();
+
+  }//pat::pat::PackedCandidate loop end
+
+  double reliso_Puppi_withLep    = val_PuppiWithLep/muon.pt();
+  double reliso_Puppi_withoutlep = val_PuppiWithoutLep/muon.pt();
+  double reliso_Puppi_combined = mix_fraction * reliso_Puppi_withLep + ( 1.0 - mix_fraction) * reliso_Puppi_withoutlep;
+  return reliso_Puppi_combined;
+}
+
+bool PATMuonProducer::isNeutralHadron( long pdgid ){
+ return std::abs(pdgid) == 130;
+}
+
+bool PATMuonProducer::isChargedHadron( long pdgid ){
+ return std::abs(pdgid) == 211;
+}
+
+bool PATMuonProducer::isPhoton( long pdgid ){
+ return pdgid==22;
+}
+
 // ParameterSet description for module
 void PATMuonProducer::fillDescriptions(edm::ConfigurationDescriptions & descriptions)
 {
@@ -861,6 +936,8 @@ void PATMuonProducer::fillDescriptions(edm::ConfigurationDescriptions & descript
 
   // mini-iso
   iDesc.add<bool>("computeMiniIso", false)->setComment("whether or not to compute and store electron mini-isolation");
+  iDesc.add<bool>("computePuppiCombinedIso",false)->setComment("whether or not to compute and store puppi combined isolation");
+
   iDesc.add<edm::InputTag>("pfCandsForMiniIso", edm::InputTag("packedPFCandidates"))->setComment("collection to use to compute mini-iso");
   iDesc.add<std::vector<double> >("miniIsoParams", std::vector<double>())->setComment("mini-iso parameters to use for muons");
 

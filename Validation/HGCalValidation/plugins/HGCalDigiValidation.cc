@@ -14,6 +14,10 @@
 
 #include "DataFormats/DetId/interface/DetId.h"
 #include "DataFormats/ForwardDetId/interface/ForwardSubdetector.h"
+#include "DataFormats/ForwardDetId/interface/HFNoseDetId.h"
+#include "DataFormats/ForwardDetId/interface/HGCalDetId.h"
+#include "DataFormats/ForwardDetId/interface/HGCScintillatorDetId.h"
+#include "DataFormats/ForwardDetId/interface/HGCSiliconDetId.h"
 #include "DataFormats/HcalDetId/interface/HcalSubdetector.h"
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
 #include "DataFormats/HGCDigi/interface/HGCDigiCollections.h"
@@ -53,11 +57,13 @@ class HGCalDigiValidation : public DQMEDAnalyzer {
 public:
   struct digiInfo{
     digiInfo() {
-      x = y = z = 0.0;
-      layer = adc = charge = 0;
+      x = y = z = charge = 0.0;
+      layer = adc = 0;
+      mode = threshold = false; 
     }
-    double x, y, z;
-    int layer, charge, adc;
+    double x, y, z, charge;
+    int layer, adc;
+    bool mode, threshold; //tot mode and zero supression
   };
 
   explicit HGCalDigiValidation(const edm::ParameterSet&);
@@ -73,21 +79,23 @@ private:
   void fillDigiInfo();
   void fillOccupancyMap(std::map<int, int>& OccupancyMap, int layer);
   template<class T1, class T2> 
-  void digiValidation(const T1& detId, const T2* geom, int, uint16_t, double);
+  void digiValidation(const T1& detId, const T2* geom, int layer, 
+		      uint16_t adc, double charge, bool mode, bool threshold);
   
   // ----------member data ---------------------------
   std::string       nameDetector_;
   edm::EDGetToken   digiSource_;
-  bool              ifHCAL_;
+  bool              ifNose_, ifHCAL_;
   int               verbosity_, SampleIndx_;
   int               layers_, firstLayer_;
  
   std::map<int, int> OccupancyMap_plus_;
   std::map<int, int> OccupancyMap_minus_;
 
-  std::vector<MonitorElement*> charge_;
+  std::vector<MonitorElement*> TOA_;
   std::vector<MonitorElement*> DigiOccupancy_XY_;
   std::vector<MonitorElement*> ADC_;
+  std::vector<MonitorElement*> TOT_;
   std::vector<MonitorElement*> DigiOccupancy_Plus_;
   std::vector<MonitorElement*> DigiOccupancy_Minus_;
   MonitorElement* MeanDigiOccupancy_Plus_;
@@ -96,13 +104,17 @@ private:
 
 HGCalDigiValidation::HGCalDigiValidation(const edm::ParameterSet& iConfig) :
   nameDetector_(iConfig.getParameter<std::string>("DetectorName")),
+  ifNose_(iConfig.getParameter<bool>("ifNose")),
   ifHCAL_(iConfig.getParameter<bool>("ifHCAL")),
   verbosity_(iConfig.getUntrackedParameter<int>("Verbosity",0)),
-  SampleIndx_(iConfig.getUntrackedParameter<int>("SampleIndx",5)),
+  SampleIndx_(iConfig.getUntrackedParameter<int>("SampleIndx",0)),
   firstLayer_(1) {
 
   auto temp = iConfig.getParameter<edm::InputTag>("DigiSource");
-  if (nameDetector_ == "HGCalEESensitive" || nameDetector_ == "HGCalHESiliconSensitive" || nameDetector_ == "HGCalHEScintillatorSensitive") {
+  if ((nameDetector_ == "HGCalEESensitive") || 
+      (nameDetector_ == "HGCalHESiliconSensitive") || 
+      (nameDetector_ == "HGCalHEScintillatorSensitive") ||
+      (nameDetector_ == "HGCalHFNoseSensitive")) {
     digiSource_    = consumes<HGCalDigiCollection>(temp);
   } else if (nameDetector_ == "HCal") {
     if (ifHCAL_) digiSource_ = consumes<QIE11DigiCollection>(temp);
@@ -111,7 +123,8 @@ HGCalDigiValidation::HGCalDigiValidation(const edm::ParameterSet& iConfig) :
     throw cms::Exception("BadHGCDigiSource")
       << "HGCal DetectorName given as " << nameDetector_ << " must be: "
       << "\"HGCalEESensitive\", \"HGCalHESiliconSensitive\", "
-      << "\"HGCalHEScintillatorSensitive\", or \"HCal\"!"; 
+      << "\"HGCalHEScintillatorSensitive\", \"HGCalHFNoseSensitive\", "
+      << "or \"HCal\"!"; 
   }  
 }
 
@@ -119,9 +132,10 @@ void HGCalDigiValidation::fillDescriptions(edm::ConfigurationDescriptions& descr
   edm::ParameterSetDescription desc;
   desc.add<std::string>("DetectorName","HGCalEESensitive");
   desc.add<edm::InputTag>("DigiSource",edm::InputTag("hgcalDigis","EE"));
+  desc.add<bool>("ifNose",false);
   desc.add<bool>("ifHCAL",false);
   desc.addUntracked<int>("Verbosity",0);
-  desc.addUntracked<int>("SampleIndx",0);
+  desc.addUntracked<int>("SampleIndx",2); // central bx
   descriptions.add("hgcalDigiValidationEEDefault",desc);
 }
 
@@ -137,24 +151,28 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
     edm::ESHandle<CaloGeometry> geom;
     iSetup.get<CaloGeometryRecord>().get(geom);
     if (!geom.isValid()) 
-      edm::LogVerbatim("HGCalValidation") << "HGCalDigiValidation: Cannot get valid "
-					  << "HGCalGeometry Object for " << nameDetector_;
+      edm::LogVerbatim("HGCalValidation") << "HGCalDigiValidation: Cannot get "
+					  << "valid Geometry Object for " 
+					  << nameDetector_;
     geom1 = geom.product();
   } else {
     edm::ESHandle<HGCalGeometry> geom;
     iSetup.get<IdealGeometryRecord>().get(nameDetector_, geom);
     if (!geom.isValid()) 
-      edm::LogVerbatim("HGCalValidation") << "HGCalDigiValidation: Cannot get valid "
-					  << "HGCalGeometry Object for " << nameDetector_;
+      edm::LogVerbatim("HGCalValidation") << "HGCalDigiValidation: Cannot get "
+					  << "valid Geometry Object for " 
+					  << nameDetector_;
     geom0 = geom.product();
     HGCalGeometryMode::GeometryMode mode = geom0->topology().geomMode();
     if ((mode == HGCalGeometryMode::Hexagon8) ||
 	(mode == HGCalGeometryMode::Hexagon8Full)) geomType = 1;
     else if (mode == HGCalGeometryMode::Trapezoid) geomType = 2;
+    if (nameDetector_ == "HGCalHFNoseSensitive")   geomType = 3;
   }
 
   unsigned int ntot(0), nused(0);
-  if (nameDetector_ == "HGCalEESensitive") {
+  if ((nameDetector_ == "HGCalEESensitive") ||
+      (nameDetector_ == "HGCalHFNoseSensitive")) {
     //HGCalEE
     edm::Handle<HGCalDigiCollection> theHGCEEDigiContainers;
     iEvent.getByToken(digiSource_, theHGCEEDigiContainers);
@@ -163,22 +181,25 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	edm::LogVerbatim("HGCalValidation") << nameDetector_ << " with " 
 					    << theHGCEEDigiContainers->size() 
 					    << " element(s)";
-      
       for (const auto & it: *(theHGCEEDigiContainers.product())) {
 	ntot++; nused++;
 	DetId      detId     = it.id();
 	int        layer     = ((geomType == 0) ? HGCalDetId(detId).layer() :
-				HGCSiliconDetId(detId).layer());
+				(geomType == 1) ?
+				HGCSiliconDetId(detId).layer() :
+				HFNoseDetId(detId).layer());
 	const HGCSample&  hgcSample = it.sample(SampleIndx_);
 	uint16_t   gain      = hgcSample.toa();
 	uint16_t   adc       = hgcSample.data();
-	double     charge    = adc*gain;
-	digiValidation(detId, geom0, layer, adc, charge);
+	double     charge    = gain;
+	bool       totmode   = hgcSample.mode();
+	bool   zerothreshold = hgcSample.threshold();
+	digiValidation(detId, geom0, layer, adc, charge, totmode, zerothreshold);
       }
       fillDigiInfo();
     } else {
       edm::LogVerbatim("HGCalValidation") << "DigiCollection handle does not "
-					  << "exist for HGCEE!!!";
+					  << "exist for " << nameDetector_;
     }
   } else if ((nameDetector_ == "HGCalHESiliconSensitive") || 
 	     (nameDetector_ == "HGCalHEScintillatorSensitive")) {
@@ -190,7 +211,6 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	edm::LogVerbatim("HGCalValidation") << nameDetector_ << " with " 
 					    << theHGCHEDigiContainers->size()
 					    << " element(s)";
-      
       for (const auto & it: *(theHGCHEDigiContainers.product())) {
 	ntot++; nused++;
 	DetId      detId     = it.id();
@@ -200,13 +220,15 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	const HGCSample&  hgcSample = it.sample(SampleIndx_);
 	uint16_t   gain      = hgcSample.toa();
 	uint16_t   adc       = hgcSample.data();
-	double     charge    = adc*gain;
-	digiValidation(detId, geom0, layer, adc, charge);
+	double     charge    = gain;
+	bool       totmode   = hgcSample.mode();
+	bool   zerothreshold = hgcSample.threshold();
+	digiValidation(detId, geom0, layer, adc, charge, totmode, zerothreshold);
       }
       fillDigiInfo();
     } else {
       edm::LogVerbatim("HGCalValidation") << "DigiCollection handle does not "
-					  << "exist for HGCFH!!!";
+					  << "exist for " << nameDetector_;
     }
   } else if ((nameDetector_ == "HCal") && (!ifHCAL_)) {
     //HGCalBH
@@ -217,7 +239,6 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	edm::LogVerbatim("HGCalValidation") << nameDetector_ << " with " 
 					    << theHGCBHDigiContainers->size()
 					    << " element(s)";
-      
       for (const auto & it: *(theHGCBHDigiContainers.product())) {
 	ntot++; nused++;
 	HcalDetId  detId     = it.id();
@@ -225,13 +246,15 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	const HGCSample&  hgcSample = it.sample(SampleIndx_);
 	uint16_t   gain      = hgcSample.toa();
 	uint16_t   adc       = hgcSample.data();
-	double     charge    = adc*gain;
-	digiValidation(detId, geom1, layer, adc, charge);
+	double     charge    = gain;
+	bool       totmode   = hgcSample.mode();
+	bool   zerothreshold = hgcSample.threshold();
+	digiValidation(detId, geom1, layer, adc, charge, totmode, zerothreshold);
       }
       fillDigiInfo();
     } else {
       edm::LogWarning("HGCalValidation") << "DigiCollection handle does not "
-					 << "exist for HGCBH!!!";
+					 << "exist for " << nameDetector_;
     }
   } else if (nameDetector_ == "HCal") {
     //HE
@@ -257,59 +280,65 @@ void HGCalDigiValidation::analyze(const edm::Event& iEvent,
 	  HcalCoderDb coder(*channelCoder, *shape);
 	  CaloSamples tool;
 	  coder.adc2fC(df, tool);
-	  int       layer  = detId.depth();
-	  uint16_t  adc    = (df)[SampleIndx_].adc();
-	  int       capid  = (df)[SampleIndx_].capid();
-	  double    charge = (tool[SampleIndx_] - calibrations.pedestal(capid));
-	  digiValidation(detId, geom1, layer, adc, charge);
+	  int       layer      = detId.depth();
+	  uint16_t  adc        = (df)[SampleIndx_].adc();
+	  int       capid      = (df)[SampleIndx_].capid();
+	  double    charge     = (tool[SampleIndx_] - calibrations.pedestal(capid));
+	  bool      totmode    = false;
+	  bool   zerothreshold = false;
+	  digiValidation(detId, geom1, layer, adc, charge, totmode, zerothreshold);
 	}
       }
       fillDigiInfo();
     } else {
       edm::LogWarning("HGCalValidation") << "DigiCollection handle does not "
-					 << "exist for HGCBH!!!";
+					 << "exist for " << nameDetector_;
     }
   } else {
     edm::LogWarning("HGCalValidation") << "invalid detector name !! " 
 				       << nameDetector_;
   }
-  edm::LogVerbatim("HGCalValidation") << "Event " << iEvent.id().event()
-				      << " with " << ntot << " total and "
-				      << nused << " used digis";
+  if (verbosity_>0)
+    edm::LogVerbatim("HGCalValidation") << "Event " << iEvent.id().event()
+					<< " with " << ntot << " total and "
+					<< nused << " used digis";
 }
 
 template<class T1, class T2>
 void HGCalDigiValidation::digiValidation(const T1& detId, const T2* geom, 
 					 int layer, uint16_t adc, 
-					 double charge) {
+					 double charge, bool mode, bool threshold) {
   
   if (verbosity_>1) edm::LogVerbatim("HGCalValidation") << std::hex 
 							<< detId.rawId()
-							<< std::dec;
+							<< std::dec
+							<< " " << detId.rawId();
   DetId id1 = DetId(detId.rawId());
   const GlobalPoint& global1 = geom->getPosition(id1);
   
   if (verbosity_>1) 
-    edm::LogVerbatim("HGCalValidation") << " adc = "         <<  adc
-					<< " charge = "      <<  charge;
+    edm::LogVerbatim("HGCalValidation") << " adc = "      <<  adc
+					<< " toa = "      <<  charge;
   
   digiInfo   hinfo; 
-  hinfo.x       =  global1.x();
-  hinfo.y       =  global1.y();
-  hinfo.z       =  global1.z();
-  hinfo.adc     =  adc;
-  hinfo.charge  =  charge; //charges[0];
-  hinfo.layer   =  layer-firstLayer_;
+  hinfo.x         =  global1.x();
+  hinfo.y         =  global1.y();
+  hinfo.z         =  global1.z();
+  hinfo.adc       =  adc;
+  hinfo.charge    =  charge;
+  hinfo.layer     =  layer-firstLayer_;
+  hinfo.mode      =  mode;
+  hinfo.threshold =  threshold;
   
   if (verbosity_>1) 
     edm::LogVerbatim("HGCalValidation") << "gx =  "  << hinfo.x
 					<< " gy = "  << hinfo.y
 					<< " gz = "  << hinfo.z;
-  
-  fillDigiInfo(hinfo);
 
   if (global1.eta() > 0)  fillOccupancyMap(OccupancyMap_plus_,  hinfo.layer);
   else                    fillOccupancyMap(OccupancyMap_minus_, hinfo.layer);
+
+  fillDigiInfo(hinfo);
   
 }
 
@@ -321,9 +350,16 @@ void HGCalDigiValidation::fillOccupancyMap(std::map<int, int>& OccupancyMap,
 
 void HGCalDigiValidation::fillDigiInfo(digiInfo& hinfo) {
   int ilayer = hinfo.layer;
-  charge_.at(ilayer)->Fill(hinfo.charge);
-  DigiOccupancy_XY_.at(ilayer)->Fill(hinfo.x, hinfo.y);
-  ADC_.at(ilayer)->Fill(hinfo.adc);
+  TOA_.at(ilayer)->Fill(hinfo.charge);
+    
+  if (hinfo.mode) {
+    TOT_.at(ilayer)->Fill(hinfo.adc);
+  }
+
+  if (!hinfo.mode && hinfo.threshold) {
+    ADC_.at(ilayer)->Fill(hinfo.adc);
+    DigiOccupancy_XY_.at(ilayer)->Fill(hinfo.x, hinfo.y);
+  }
 }
 
 void HGCalDigiValidation::fillDigiInfo() {
@@ -371,11 +407,14 @@ void HGCalDigiValidation::bookHistograms(DQMStore::IBooker& iB,
   std::ostringstream histoname;
   for (int il = 0; il < layers_; ++il) {
     int ilayer = firstLayer_ + il;
-    histoname.str(""); histoname << "charge_"<< "layer_" << ilayer;
-    charge_.push_back(iB.book1D(histoname.str().c_str(),"charge_",100,-25,25));
+    histoname.str(""); histoname << "TOA_"<< "layer_" << ilayer;
+    TOA_.push_back(iB.book1D(histoname.str().c_str(),"toa_",1024,0,1024));
       
     histoname.str(""); histoname << "ADC_" << "layer_" << ilayer;
-    ADC_.push_back(iB.book1D(histoname.str().c_str(), "DigiOccupancy",200,0,1000));
+    ADC_.push_back(iB.book1D(histoname.str().c_str(), "ADCDigiOccupancy",1024,0,1024));
+
+    histoname.str(""); histoname << "TOT_" << "layer_" << ilayer;
+    TOT_.push_back(iB.book1D(histoname.str().c_str(), "TOTDigiOccupancy",4096,0,4096));
       
     histoname.str(""); histoname << "DigiOccupancy_XY_" << "layer_" << ilayer;
     DigiOccupancy_XY_.push_back(iB.book2D(histoname.str().c_str(), "DigiOccupancy", 50, -500, 500, 50, -500, 500));

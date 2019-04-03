@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 # idea stolen from:
 # http://cmssw.cvs.cern.ch/cgi-bin/cmssw.cgi/CMSSW/
 #        PhysicsTools/PatAlgos/python/tools/cmsswVersionTools.py
@@ -12,8 +13,8 @@ import sys
 import Utilities.General.cmssw_das_client as das_client
 from FWCore.PythonUtilities.LumiList import LumiList
 
-from helperFunctions import cache
-from TkAlExceptions import AllInOneError
+from .helperFunctions import cache
+from .TkAlExceptions import AllInOneError
 
 class Dataset(object):
     def __init__( self, datasetName, dasLimit = 0, tryPredefinedFirst = True,
@@ -352,7 +353,7 @@ class Dataset(object):
         return forcerunrangefunction
 
     def __getData( self, dasQuery, dasLimit = 0 ):
-	dasData = das_client.get_data(dasQuery, dasLimit)
+        dasData = das_client.get_data(dasQuery, dasLimit)
         if isinstance(dasData, str):
             jsondict = json.loads( dasData )
         else:
@@ -734,19 +735,19 @@ class Dataset(object):
                     "only work for official datasets, not predefined _cff.py files" )
             raise AllInOneError( msg )
         if self.__predefined and parent:
-                with open(self.__filename) as f:
-                    if "secFiles.extend" not in f.read():
-                        msg = ("The predefined dataset '%s' does not contain secondary files, "
-                               "which your validation requires!") % self.__name
-                        if self.__official:
-                            self.__name = self.__origName
-                            self.__predefined = False
-                            print(msg)
-                            print ("Retreiving the files from DAS.  You will be asked if you want "
-                                   "to overwrite the old dataset.\n"
-                                   "It will still be compatible with validations that don't need secondary files.")
-                        else:
-                            raise AllInOneError(msg)
+            with open(self.__filename) as f:
+                if "secFiles.extend" not in f.read():
+                    msg = ("The predefined dataset '%s' does not contain secondary files, "
+                           "which your validation requires!") % self.__name
+                    if self.__official:
+                        self.__name = self.__origName
+                        self.__predefined = False
+                        print(msg)
+                        print ("Retreiving the files from DAS.  You will be asked if you want "
+                               "to overwrite the old dataset.\n"
+                               "It will still be compatible with validations that don't need secondary files.")
+                    else:
+                        raise AllInOneError(msg)
 
         if self.__predefined:
             snippet = ("process.load(\"Alignment.OfflineValidation.%s_cff\")\n"
