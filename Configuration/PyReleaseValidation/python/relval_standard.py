@@ -30,6 +30,14 @@ workflows[1302.17] = ['', ['ProdTTbar_13UP17','DIGIUP17PROD1','RECOPRODUP17']]
 workflows[1303.17] = ['', ['ProdQCD_Pt_3000_3500_13UP17','DIGIUP17PROD1','RECOPRODUP17']]
 workflows.addOverride(1303.17,overridesEv5)
 
+#####Prod2018
+#workflows[1301.18] = ['', ['ProdMinBias_13UP18','DIGIUP18PROD1','RECOPRODUP18']]
+workflows[1302.18] = ['', ['ProdTTbar_13UP18','DIGIUP18PROD1','RECOPRODUP18']]
+#workflows[1303.18] = ['', ['ProdQCD_Pt_3000_3500_13UP18','DIGIUP18PROD1','RECOPRODUP18']]
+workflows[1304.18] = ['', ['ProdZEE_13UP18','DIGIUP18PROD1','RECOPRODUP18','MINIAODMCUP18']]
+workflows[1304.181] = ['', ['ProdZEE_13UP18','DIGIUP18PROD1','RECOPRODUP18bParking','MINIAODMCUP18bParking']]
+#workflows.addOverride(1303.17,overridesEv5)
+
 ### data ###
 workflows[4.5]  = ['', ['RunCosmicsA','RECOCOSD','ALCACOSD','HARVESTDC']]
 #workflows[4.6]  = ['', ['MinimumBias2010A','RECODR1','HARVESTDR1']]
@@ -341,7 +349,7 @@ workflows[136.8561] = ['',['RunZeroBias_hBStarTk','HLTDR2_2018_hBStar','RECODR2_
 workflows[136.8562] = ['',['RunZeroBias1_hBStarRP','HLTDR2_2018_hBStar','RECODR2_2018reHLT_Prompt_hBStar','HARVEST2018_hBStar']]
 
 ### NANOAOD wf on 2018 prompt reco MINIADD
-workflows[136.8521] = ['',['RunJetHT2018A_nano','NANOEDM2018','HARVESTNANOAOD2018']]
+workflows[136.8521] = ['',['RunJetHT2018A_nano','NANOEDM2018_102Xv1','HARVESTNANOAOD2018_102Xv1']]
 
 ### run 2018B ###
 workflows[136.861] = ['',['RunHLTPhy2018B','HLTDR2_2018','RECODR2_2018reHLT_Prompt','HARVEST2018']]
