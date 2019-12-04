@@ -13,6 +13,7 @@
 #include "FastSimulation/TrackingRecHitProducer/interface/TrackingRecHitAlgorithm.h"
 #include "FastSimulation/TrackingRecHitProducer/interface/TrackingRecHitAlgorithmFactory.h"
 #include "FastSimulation/TrackingRecHitProducer/interface/TrackingRecHitPipe.h"
+#include "FastSimulation/TrackingRecHitProducer/interface/PixelTemplateSmearerBase.h"
 
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
@@ -27,6 +28,10 @@
 
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "Geometry/Records/interface/TrackerTopologyRcd.h"
+// Pixel-related stuff:
+#include "CondFormats/SiPixelObjects/interface/SiPixelTemplateDBObject.h"
+#include "RecoLocalTracker/SiPixelRecHits/interface/SiPixelTemplate.h"
+#include "CalibTracker/Records/interface/SiPixelTemplateDBObjectESProducerRcd.h"
 
 #include "FastSimulation/TrackingRecHitProducer/interface/TrackerDetIdSelector.h"
 
@@ -46,6 +51,7 @@ class TrackingRecHitProducer:
         edm::IOVSyncValue _iovSyncValue;
         std::map<unsigned int, TrackingRecHitPipe> _detIdPipes;
         void setupDetIdPipes(const edm::EventSetup& eventSetup);
+        std::vector< SiPixelTemplateStore > _pixelTempStore ;   // pixel template storage
 
     public:
         TrackingRecHitProducer(const edm::ParameterSet& config);
@@ -99,7 +105,11 @@ TrackingRecHitProducer::~TrackingRecHitProducer()
         delete algo;
     }
     _recHitAlgorithms.clear();
+
+    //--- Delete the templates. This is safe even if thePixelTemp_ vector is empty.
+    for (auto x : _pixelTempStore) x.destroy();
 }
+
 
 void TrackingRecHitProducer::beginStream(edm::StreamID id)
 {
@@ -109,9 +119,30 @@ void TrackingRecHitProducer::beginStream(edm::StreamID id)
     }
 }
 
-void TrackingRecHitProducer::beginRun(edm::Run const&, const edm::EventSetup& eventSetup)
+void TrackingRecHitProducer::beginRun(edm::Run const& run, const edm::EventSetup& eventSetup)
 {
+    //--- Since all pixel algorithms (of which there could be several) use the same
+    //    templateStore, filled out from the same DB Object, we need to it centrally
+    //    (namely here), and then distribute it to the algorithms.  Note that only
+    //    the pixel algorithms implement beginRun(), for the strip tracker this defaults
+    //    to a no-op.
 
+    edm::ESHandle<SiPixelTemplateDBObject> templateDBobject;
+    eventSetup.get<SiPixelTemplateDBObjectESProducerRcd>().get(templateDBobject);
+    const SiPixelTemplateDBObject * pixelTemplateDBObject = templateDBobject.product();
+  
+    //--- Now that we have the DB object, load the correct templates from the DB.  
+    //    (They are needed for data and full sim MC, so in a production FastSim
+    //    run, everything should already be in the DB.)
+    if ( !SiPixelTemplate::pushfile( *pixelTemplateDBObject, _pixelTempStore ) ) {
+         throw cms::Exception("TrackingRecHitProducer:")
+	   << "SiPixel Templates not loaded correctly from the DB object!" << std::endl;
+    }
+
+    for (TrackingRecHitAlgorithm* algo: _recHitAlgorithms)
+    {
+      algo->beginRun(run, eventSetup, pixelTemplateDBObject, _pixelTempStore );
+    }
 }
 
 void TrackingRecHitProducer::setupDetIdPipes(const edm::EventSetup& eventSetup)
@@ -204,15 +235,18 @@ void TrackingRecHitProducer::produce(edm::Event& event, const edm::EventSetup& e
             {
                 output_recHits->push_back(recHitToSimHitIdPairsList[irecHit].first);
                 const std::vector<TrackingRecHitProduct::SimHitIdPair>& simHitIdPairList = recHitToSimHitIdPairsList[irecHit].second;
-                for (unsigned int isimHit = 0; isimHit < simHitIdPairList.size(); ++isimHit)
-                {
+                double energyLoss_tot = 0;//
+                for (unsigned int isimHit = 0; isimHit < simHitIdPairList.size(); ++isimHit){
                     unsigned int simHitId = simHitIdPairList[isimHit].first;
+                    const PSimHit * simHit = simHitIdPairList[isimHit].second;
+                    energyLoss_tot+=simHit->energyLoss();//energy loss of sim hit in GeV std::cout << "energyLoss_tot" << energyLoss_tot << std::endl;
                     if (not (*output_recHitRefs)[simHitId].isNull())
                     {
                         throw cms::Exception("FastSimulation/TrackingRecHitProducer","A PSimHit cannot lead to multiple FastTrackerRecHits");
                     }
                     (*output_recHitRefs)[simHitId] = FastTrackerRecHitRef(output_recHits_refProd,output_recHits->size()-1);
                 }
+                static_cast<FastSingleTrackerRecHit&>(output_recHits->back()).setEnergyLoss(energyLoss_tot);        
             }
         }
         else
