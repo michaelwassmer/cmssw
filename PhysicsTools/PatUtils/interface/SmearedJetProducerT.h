@@ -155,175 +155,27 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
 
             produces<JetCollection>();
         }
-      }
 
-      return matched_genJet;
-    }
+        static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+            edm::ParameterSetDescription desc;
 
-  private:
-    edm::EDGetTokenT<reco::GenJetCollection> m_genJetsToken;
-    edm::Handle<reco::GenJetCollection> m_genJets;
+            desc.add<edm::InputTag>("src");
+            desc.add<bool>("enabled");
+            desc.add<edm::InputTag>("rho");
+            desc.add<std::int32_t>("variation", 0);
+            desc.add<std::uint32_t>("seed", 37428479);
+            desc.add<bool>("skipGenMatching", false);
+            desc.add<bool>("useDeterministicSeed", true);
+            desc.addUntracked<bool>("debug", false);
 
-    double m_dR_max;
-    double m_dPt_max_factor;
-  };
-};  // namespace pat
+            auto source =
+	      (edm::ParameterDescription<std::string>("algo", true) and edm::ParameterDescription<std::string>("algopt", true)) xor
+	      (edm::ParameterDescription<edm::FileInPath>("resolutionFile", true) and edm::ParameterDescription<edm::FileInPath>("scaleFactorFile", true));
+            desc.addNode(std::move(source));
 
-template <typename T>
-class SmearedJetProducerT : public edm::stream::EDProducer<> {
-  using JetCollection = std::vector<T>;
+            pat::GenJetMatcher::fillDescriptions(desc);
 
-public:
-  explicit SmearedJetProducerT(const edm::ParameterSet& cfg)
-      : m_enabled(cfg.getParameter<bool>("enabled")),
-        m_useDeterministicSeed(cfg.getParameter<bool>("useDeterministicSeed")),
-        m_debug(cfg.getUntrackedParameter<bool>("debug", false)) {
-    m_jets_token = consumes<JetCollection>(cfg.getParameter<edm::InputTag>("src"));
-
-    if (m_enabled) {
-      m_rho_token = consumes<double>(cfg.getParameter<edm::InputTag>("rho"));
-
-      m_use_txt_files = cfg.exists("resolutionFile") && cfg.exists("scaleFactorFile");
-
-      if (m_use_txt_files) {
-        std::string resolutionFile = cfg.getParameter<edm::FileInPath>("resolutionFile").fullPath();
-        std::string scaleFactorFile = cfg.getParameter<edm::FileInPath>("scaleFactorFile").fullPath();
-
-        m_resolution_from_file.reset(new JME::JetResolution(resolutionFile));
-        m_scale_factor_from_file.reset(new JME::JetResolutionScaleFactor(scaleFactorFile));
-      } else {
-        m_jets_algo = cfg.getParameter<std::string>("algo");
-        m_jets_algo_pt = cfg.getParameter<std::string>("algopt");
-      }
-
-      std::uint32_t seed = cfg.getParameter<std::uint32_t>("seed");
-      m_random_generator = std::mt19937(seed);
-
-      bool skipGenMatching = cfg.getParameter<bool>("skipGenMatching");
-      if (!skipGenMatching)
-        m_genJetMatcher = std::make_shared<pat::GenJetMatcher>(cfg, consumesCollector());
-
-      std::int32_t variation = cfg.getParameter<std::int32_t>("variation");
-      m_nomVar = 1;
-      if (variation == 0)
-        m_systematic_variation = Variation::NOMINAL;
-      else if (variation == 1)
-        m_systematic_variation = Variation::UP;
-      else if (variation == -1)
-        m_systematic_variation = Variation::DOWN;
-      else if (variation == 101) {
-        m_systematic_variation = Variation::NOMINAL;
-        m_nomVar = 1;
-      } else if (variation == -101) {
-        m_systematic_variation = Variation::NOMINAL;
-        m_nomVar = -1;
-      } else
-        throw edm::Exception(edm::errors::ConfigFileReadError,
-                             "Invalid value for 'variation' parameter. Only -1, 0, 1 or 101, -101 are supported.");
-    }
-
-    produces<JetCollection>();
-  }
-
-  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
-    edm::ParameterSetDescription desc;
-
-    desc.add<edm::InputTag>("src");
-    desc.add<bool>("enabled");
-    desc.add<edm::InputTag>("rho");
-    desc.add<std::int32_t>("variation", 0);
-    desc.add<std::uint32_t>("seed", 37428479);
-    desc.add<bool>("skipGenMatching", false);
-    desc.add<bool>("useDeterministicSeed", true);
-    desc.addUntracked<bool>("debug", false);
-
-    auto source = (edm::ParameterDescription<std::string>("algo", true) and
-                   edm::ParameterDescription<std::string>("algopt", true)) xor
-                  (edm::ParameterDescription<edm::FileInPath>("resolutionFile", true) and
-                   edm::ParameterDescription<edm::FileInPath>("scaleFactorFile", true));
-    desc.addNode(std::move(source));
-
-    pat::GenJetMatcher::fillDescriptions(desc);
-
-    descriptions.addDefault(desc);
-  }
-
-  void produce(edm::Event& event, const edm::EventSetup& setup) override {
-    edm::Handle<JetCollection> jets_collection;
-    event.getByToken(m_jets_token, jets_collection);
-
-    // Disable the module when running on real data
-    if (m_enabled && event.isRealData()) {
-      m_enabled = false;
-      m_genJetMatcher.reset();
-    }
-
-    edm::Handle<double> rho;
-    if (m_enabled)
-      event.getByToken(m_rho_token, rho);
-
-    JME::JetResolution resolution;
-    JME::JetResolutionScaleFactor resolution_sf;
-
-    const JetCollection& jets = *jets_collection;
-
-    if (m_enabled) {
-      if (m_use_txt_files) {
-        resolution = *m_resolution_from_file;
-        resolution_sf = *m_scale_factor_from_file;
-      } else {
-        resolution = JME::JetResolution::get(setup, m_jets_algo_pt);
-        resolution_sf = JME::JetResolutionScaleFactor::get(setup, m_jets_algo);
-      }
-
-      if (m_useDeterministicSeed) {
-        unsigned int runNum_uint = static_cast<unsigned int>(event.id().run());
-        unsigned int lumiNum_uint = static_cast<unsigned int>(event.id().luminosityBlock());
-        unsigned int evNum_uint = static_cast<unsigned int>(event.id().event());
-        unsigned int jet0eta = uint32_t(jets.empty() ? 0 : jets[0].eta() / 0.01);
-        std::uint32_t seed = jet0eta + m_nomVar + (lumiNum_uint << 10) + (runNum_uint << 20) + evNum_uint;
-        m_random_generator.seed(seed);
-      }
-    }
-
-    if (m_genJetMatcher)
-      m_genJetMatcher->getTokens(event);
-
-    auto smearedJets = std::make_unique<JetCollection>();
-
-    for (const auto& jet : jets) {
-      if ((!m_enabled) || (jet.pt() == 0)) {
-        // Module disabled or invalid p4. Simply copy the input jet.
-        smearedJets->push_back(jet);
-
-        continue;
-      }
-
-      double jet_resolution = resolution.getResolution(
-          {{JME::Binning::JetPt, jet.pt()}, {JME::Binning::JetEta, jet.eta()}, {JME::Binning::Rho, *rho}});
-      double jer_sf = resolution_sf.getScaleFactor({{JME::Binning::JetPt, jet.pt()}, {JME::Binning::JetEta, jet.eta()}},
-                                                   m_systematic_variation);
-      if (m_debug) {
-        std::cout << "jet:  pt: " << jet.pt() << "  eta: " << jet.eta() << "  phi: " << jet.phi()
-                  << "  e: " << jet.energy() << std::endl;
-        std::cout << "resolution: " << jet_resolution << std::endl;
-        std::cout << "resolution scale factor: " << jer_sf << std::endl;
-      }
-
-      const reco::GenJet* genJet = nullptr;
-      if (m_genJetMatcher)
-        genJet = m_genJetMatcher->match(jet, jet.pt() * jet_resolution);
-
-      double smearFactor = 1.;
-
-      if (genJet) {
-        /*
-                     * Case 1: we have a "good" gen jet matched to the reco jet
-                     */
-
-        if (m_debug) {
-          std::cout << "gen jet:  pt: " << genJet->pt() << "  eta: " << genJet->eta() << "  phi: " << genJet->phi()
-                    << "  e: " << genJet->energy() << std::endl;
+            descriptions.addDefault(desc);
         }
 
         virtual void produce(edm::Event& event, const edm::EventSetup& setup) override {
@@ -477,30 +329,29 @@ public:
             return smearFactor;
         }
 
-private:
-  static constexpr const double MIN_JET_ENERGY = 1e-2;
+    private:
+        static constexpr const double MIN_JET_ENERGY = 1e-2;
 
-  edm::EDGetTokenT<JetCollection> m_jets_token;
-  edm::EDGetTokenT<double> m_rho_token;
-  bool m_enabled;
-  std::string m_jets_algo_pt;
-  std::string m_jets_algo;
-  Variation m_systematic_variation;
-  bool m_useDeterministicSeed;
-  bool m_debug;
-  std::shared_ptr<pat::GenJetMatcher> m_genJetMatcher;
+        edm::EDGetTokenT<JetCollection> m_jets_token;
+        edm::EDGetTokenT<double> m_rho_token;
+        bool m_enabled;
+        std::string m_jets_algo_pt;
+        std::string m_jets_algo;
+        Variation m_systematic_variation;
+        bool m_useDeterministicSeed;
+        bool m_debug;
+        std::shared_ptr<pat::GenJetMatcher> m_genJetMatcher;
 
-  bool m_use_txt_files;
-  std::unique_ptr<JME::JetResolution> m_resolution_from_file;
-  std::unique_ptr<JME::JetResolutionScaleFactor> m_scale_factor_from_file;
+        bool m_use_txt_files;
+        std::unique_ptr<JME::JetResolution> m_resolution_from_file;
+        std::unique_ptr<JME::JetResolutionScaleFactor> m_scale_factor_from_file;
 
-  std::mt19937 m_random_generator;
-  TRandom3  m_random_generator_alt;
+        std::mt19937 m_random_generator;
+        TRandom3  m_random_generator_alt;
 
+        GreaterByPt<T> jetPtComparator;
 
-  GreaterByPt<T> jetPtComparator;
-
-  int m_nomVar;
+	int m_nomVar;
 };
 #endif
 
