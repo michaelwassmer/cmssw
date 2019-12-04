@@ -1,4 +1,4 @@
-# /dev/CMSSW_10_6_0/GRun
+# /dev/CMSSW_11_0_0/GRun
 
 import FWCore.ParameterSet.Config as cms
 
@@ -121,6 +121,12 @@ streamPhysicsCommissioning_datasetCommissioning_selector.triggerConditions = cms
     'HLT_IsoTrackHE_v4', 
     'HLT_L1_CDC_SingleMu_3_er1p2_TOP120_DPHI2p618_3p142_v2'
 )
+
+from HLTrigger.HLTfilters.triggerResultsFilter_cfi import triggerResultsFilter as streamPhysicsCommissioning_datasetCosmics_selector
+streamPhysicsCommissioning_datasetCosmics_selector.hltResults = cms.InputTag('TriggerResults', '', 'HLT')
+streamPhysicsCommissioning_datasetCosmics_selector.l1tResults = cms.InputTag('')
+streamPhysicsCommissioning_datasetCosmics_selector.throw      = cms.bool(False)
+streamPhysicsCommissioning_datasetCosmics_selector.triggerConditions = cms.vstring('HLT_L1SingleMuCosmics_v1')
 
 from HLTrigger.HLTfilters.triggerResultsFilter_cfi import triggerResultsFilter as streamPhysicsCommissioning_datasetHLTPhysics_selector
 streamPhysicsCommissioning_datasetHLTPhysics_selector.hltResults = cms.InputTag('TriggerResults', '', 'HLT')

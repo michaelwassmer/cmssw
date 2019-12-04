@@ -1,7 +1,7 @@
 import FWCore.ParameterSet.Config as cms
-from Configuration.StandardSequences.Eras import eras
 
-process = cms.Process("Sim",eras.Run2_2018)
+from Configuration.Eras.Era_Run2_2018_cff import Run2_2018
+process = cms.Process("Sim",Run2_2018)
 
 process.load("SimG4CMS.Calo.PythiaMinBias_cfi")
 process.load("SimGeneral.HepPDTESSource.pythiapdt_cfi")
@@ -71,6 +71,7 @@ process.g4SimHits.Watchers = cms.VPSet(cms.PSet(
             EBSDNames       = cms.vstring('EBRY'),
             EESDNames       = cms.vstring('EFRY'),
             HCSDNames       = cms.vstring('HBS','HES','HTS'),
+            AllSteps        = cms.int32(2),
             SlopeLightYield = cms.double(0.02),
             BirkC1EC        = cms.double(0.03333),
             BirkSlopeEC     = cms.double(0.253694),

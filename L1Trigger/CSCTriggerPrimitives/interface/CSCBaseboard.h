@@ -7,15 +7,19 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "Geometry/CSCGeometry/interface/CSCGeometry.h"
 #include "L1Trigger/CSCCommonTrigger/interface/CSCConstants.h"
+#include "L1Trigger/CSCTriggerPrimitives/interface/CSCPatternBank.h"
 #include "L1Trigger/CSCTriggerPrimitives/interface/CSCUpgradeMotherboardLUT.h"
 #include "L1Trigger/CSCTriggerPrimitives/interface/CSCUpgradeMotherboardLUTGenerator.h"
+#include "CondFormats/CSCObjects/interface/CSCDBL1TPParameters.h"
 
-class CSCBaseboard
-{
- public:
+class CSCBaseboard {
+public:
   /** Normal constructor. */
-  CSCBaseboard(unsigned endcap, unsigned station, unsigned sector,
-               unsigned subsector, unsigned chamber,
+  CSCBaseboard(unsigned endcap,
+               unsigned station,
+               unsigned sector,
+               unsigned subsector,
+               unsigned chamber,
                const edm::ParameterSet& conf);
 
   /** Constructor for use during testing. */
@@ -24,11 +28,11 @@ class CSCBaseboard
   /** Default destructor. */
   virtual ~CSCBaseboard() = default;
 
-  void setCSCGeometry(const CSCGeometry *g);
+  void setCSCGeometry(const CSCGeometry* g);
 
-  std::string getCSCName() const {return theCSCName_;}
+  std::string getCSCName() const { return theCSCName_; }
 
- protected:
+protected:
   /** Chamber id (trigger-type labels). */
   const unsigned theEndcap;
   const unsigned theStation;

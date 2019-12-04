@@ -37,14 +37,15 @@
 #include "L1Trigger/CSCTriggerPrimitives/interface/CSCAnodeLCTProcessor.h"
 #include "L1Trigger/CSCTriggerPrimitives/interface/CSCCathodeLCTProcessor.h"
 #include "DataFormats/CSCDigi/interface/CSCCorrelatedLCTDigi.h"
-#include "L1Trigger/CSCTriggerPrimitives/interface/CSCBaseboard.h"
 
-class CSCMotherboard : public CSCBaseboard
-{
- public:
+class CSCMotherboard : public CSCBaseboard {
+public:
   /** Normal constructor. */
-  CSCMotherboard(unsigned endcap, unsigned station, unsigned sector,
-                 unsigned subsector, unsigned chamber,
+  CSCMotherboard(unsigned endcap,
+                 unsigned station,
+                 unsigned sector,
+                 unsigned subsector,
+                 unsigned chamber,
                  const edm::ParameterSet& conf);
 
   /** Constructor for use during testing. */
@@ -76,9 +77,8 @@ class CSCMotherboard : public CSCBaseboard
   /** Cathode LCT processor. */
   std::unique_ptr<CSCCathodeLCTProcessor> clctProc;
 
- // VK: change to protected, to allow inheritance
- protected:
-
+  // VK: change to protected, to allow inheritance
+protected:
   /* Containers for reconstructed ALCTs and CLCTs */
   std::vector<CSCALCTDigi> alctV;
   std::vector<CSCCLCTDigi> clctV;
@@ -89,8 +89,9 @@ class CSCMotherboard : public CSCBaseboard
   /** Container for second correlated LCT. */
   CSCCorrelatedLCTDigi secondLCT[CSCConstants::MAX_LCT_TBINS];
 
-  // helper function to return ALCT with correct central BX
+  // helper function to return ALCT/CLCT with correct central BX
   CSCALCTDigi getBXShiftedALCT(const CSCALCTDigi&) const;
+  CSCCLCTDigi getBXShiftedCLCT(const CSCCLCTDigi&) const;
 
   /** Configuration parameters. */
   unsigned int mpc_block_me1a;
@@ -122,15 +123,15 @@ class CSCMotherboard : public CSCBaseboard
   /** Make sure that the parameter values are within the allowed range. */
   void checkConfigParameters();
 
-  void correlateLCTs(const CSCALCTDigi& bestALCT, const CSCALCTDigi& secondALCT,
-                     const CSCCLCTDigi& bestCLCT, const CSCCLCTDigi& secondCLCT,
+  void correlateLCTs(const CSCALCTDigi& bestALCT,
+                     const CSCALCTDigi& secondALCT,
+                     const CSCCLCTDigi& bestCLCT,
+                     const CSCCLCTDigi& secondCLCT,
                      int type);
 
   // This method calculates all the TMB words and then passes them to the
   // constructor of correlated LCTs.
-  CSCCorrelatedLCTDigi constructLCTs(const CSCALCTDigi& aLCT,
-                                     const CSCCLCTDigi& cLCT,
-                                     int type, int trknmb) const;
+  CSCCorrelatedLCTDigi constructLCTs(const CSCALCTDigi& aLCT, const CSCCLCTDigi& cLCT, int type, int trknmb) const;
 
   // CLCT pattern number: encodes the pattern number itself
   unsigned int encodePattern(const int clctPattern) const;
@@ -138,8 +139,8 @@ class CSCMotherboard : public CSCBaseboard
   // 4-bit LCT quality number.Made by TMB lookup tables and used for MPC sorting.
   unsigned int findQuality(const CSCALCTDigi& aLCT, const CSCCLCTDigi& cLCT) const;
 
-  enum LCT_Quality{
-    INVALID  = 0,
+  enum LCT_Quality {
+    INVALID = 0,
     NO_CLCT = 1,
     NO_ALCT = 2,
     CLCT_LAYER_TRIGGER = 3,

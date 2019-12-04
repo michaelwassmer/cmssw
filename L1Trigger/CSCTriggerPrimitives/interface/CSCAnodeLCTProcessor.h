@@ -36,17 +36,20 @@
 
 #include "DataFormats/CSCDigi/interface/CSCWireDigiCollection.h"
 #include "DataFormats/CSCDigi/interface/CSCALCTDigi.h"
+#include "DataFormats/CSCDigi/interface/CSCALCTPreTriggerDigi.h"
 #include "CondFormats/CSCObjects/interface/CSCDBL1TPParameters.h"
 #include "L1Trigger/CSCTriggerPrimitives/interface/CSCBaseboard.h"
 
 #include <vector>
 
-class CSCAnodeLCTProcessor : public CSCBaseboard
-{
- public:
+class CSCAnodeLCTProcessor : public CSCBaseboard {
+public:
   /** Normal constructor. */
-  CSCAnodeLCTProcessor(unsigned endcap, unsigned station, unsigned sector,
-                       unsigned subsector, unsigned chamber,
+  CSCAnodeLCTProcessor(unsigned endcap,
+                       unsigned station,
+                       unsigned sector,
+                       unsigned subsector,
+                       unsigned chamber,
                        const edm::ParameterSet& conf);
 
   /** Default constructor. Used for testing. */
@@ -69,16 +72,19 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
   void run(const std::vector<int> wire[CSCConstants::NUM_LAYERS][CSCConstants::MAX_NUM_WIRES]);
 
   /** Returns vector of ALCTs in the read-out time window, if any. */
-  std::vector<CSCALCTDigi> readoutALCTs();
+  std::vector<CSCALCTDigi> readoutALCTs() const;
 
   /** Returns vector of all found ALCTs, if any. */
-  std::vector<CSCALCTDigi> getALCTs();
+  std::vector<CSCALCTDigi> getALCTs() const;
 
-  /** Pre-defined patterns. */
-  static const int pattern_envelope[CSCConstants::NUM_ALCT_PATTERNS][CSCConstants::MAX_WIRES_IN_PATTERN];
-  static const int pattern_mask_open[CSCConstants::NUM_ALCT_PATTERNS][CSCConstants::MAX_WIRES_IN_PATTERN];
-  static const int pattern_mask_r1[CSCConstants::NUM_ALCT_PATTERNS][CSCConstants::MAX_WIRES_IN_PATTERN];
+  /** read out pre-ALCTs */
+  std::vector<CSCALCTPreTriggerDigi> preTriggerDigis() const { return thePreTriggerDigis; }
 
+  /** Return best/second best ALCTs */
+  CSCALCTDigi getBestALCT(int bx) const;
+  CSCALCTDigi getSecondALCT(int bx) const;
+
+protected:
   /** Best LCTs in this chamber, as found by the processor.
       In old ALCT algorithms, up to two best ALCT per Level-1 accept window
       had been reported.
@@ -89,7 +95,6 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
   /** Second best LCTs in this chamber, as found by the processor. */
   CSCALCTDigi secondALCT[CSCConstants::MAX_ALCT_TBINS];
 
- protected:
   /** Access routines to wire digis. */
   bool getDigis(const CSCWireDigiCollection* wiredc);
   void getDigis(const CSCWireDigiCollection* wiredc, const CSCDetId& id);
@@ -104,6 +109,8 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
   unsigned int pulse[CSCConstants::NUM_LAYERS][CSCConstants::MAX_NUM_WIRES];
 
   std::vector<CSCALCTDigi> lct_list;
+
+  std::vector<CSCALCTPreTriggerDigi> thePreTriggerDigis;
 
   /** Configuration parameters. */
   unsigned int fifo_tbins, fifo_pretrig, drift_delay;
@@ -132,7 +139,6 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
 
   /** SLHC: whether to use narrow pattern mask for the rings close to the beam */
   bool narrow_mask_r1;
-
 
   /** Default values of configuration parameters. */
   static const unsigned int def_fifo_tbins, def_fifo_pretrig;
@@ -186,7 +192,7 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
      cancellation is done separately for collision and accelerator patterns. */
   virtual void ghostCancellationLogic();
 
-  virtual void ghostCancellationLogicOneWire(const int key_wire, int *ghost_cleared);
+  virtual void ghostCancellationLogicOneWire(const int key_wire, int* ghost_cleared);
 
   virtual int getTempALCTQuality(int temp_quality) const;
 
@@ -202,8 +208,7 @@ class CSCAnodeLCTProcessor : public CSCBaseboard
 
   /* Selects two collision and two accelerator ALCTs per time bin with
      the best quality. */
-  std::vector<CSCALCTDigi>
-    bestTrackSelector(const std::vector<CSCALCTDigi>& all_alcts);
+  std::vector<CSCALCTDigi> bestTrackSelector(const std::vector<CSCALCTDigi>& all_alcts);
 
   /* This method should have been an overloaded > operator, but we
      have to keep it here since need to check values in quality[][]

@@ -12,19 +12,22 @@ hgcalValidator = cms.EDAnalyzer(
 
     ### reco input configuration ###
     #2dlayerclusters, pfclusters, multiclusters
-    #label = cms.VInputTag(cms.InputTag("hgcalLayerClusters"), cms.InputTag("particleFlowClusterHGCal"), cms.InputTag("hgcalMultiClusters") ),
-    label = cms.VInputTag(cms.InputTag("hgcalLayerClusters")),
-    
+    label_lcl = cms.InputTag("hgcalLayerClusters"),
+    label_mcl = cms.VInputTag(),
+
     #General info on layers etc. 
     SaveGeneralInfo = cms.untracked.bool(True),
     #CaloParticle related plots
     doCaloParticlePlots = cms.untracked.bool(True),
+    #Layer Cluster related plots
     dolayerclustersPlots = cms.untracked.bool(True),
+    #Multi Cluster related plots
+    domulticlustersPlots = cms.untracked.bool(False),
 
     #The cumulative material budget in front of each layer. To be more specific, it 
     #is the material budget just in front of the active material (not including it). 
     #This file is created using the official material budget code. 
-    cummatbudinxo = cms.FileInPath('Validation/HGCalValidation/data/D28.cumulative.xo'),
+    cummatbudinxo = cms.FileInPath('Validation/HGCalValidation/data/D41.cumulative.xo'),
 
     ### sim input configuration ###
     label_cp_effic = cms.InputTag("mix","MergedCaloTruth"),
@@ -51,3 +54,6 @@ premix_stage2.toModify(hgcalValidator,
     label_cp_effic = "mixData:MergedCaloTruth",
     label_cp_fake = "mixData:MergedCaloTruth"
 )
+
+from Configuration.Eras.Modifier_phase2_hgcalV10_cff import phase2_hgcalV10
+phase2_hgcalV10.toModify(hgcalValidator, totallayers_to_monitor = cms.int32(50))

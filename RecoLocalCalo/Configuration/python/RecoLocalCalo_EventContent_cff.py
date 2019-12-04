@@ -71,12 +71,22 @@ phase2_hgcal.toModify( RecoLocalCaloFEVT, outputCommands = RecoLocalCaloFEVT.out
         'keep *_HGCalRecHit_*_*',
         'keep *_HGCalUncalibRecHit_*_*',
         'keep *_hgcalLayerClusters_*_*',
-        'keep *_hgcalMultiClusters_*_*'
+        'keep *_hgcalMultiClusters_*_*',
+        'keep *_iterHGCalMultiClusters_*_*',
+        'drop DetIdfloatstdmap_hgcalLayerClusters_*_*',
     ]
 )
-phase2_hgcal.toModify( RecoLocalCaloRECO, outputCommands = RecoLocalCaloRECO.outputCommands + ['keep *_HGCalRecHit_*_*','keep *_hgcalLayerClusters_*_*', 'keep *_hgcalMultiClusters_*_*'] )
+phase2_hgcal.toModify( RecoLocalCaloRECO,
+    outputCommands = RecoLocalCaloRECO.outputCommands + ['keep *_HGCalRecHit_*_*',
+                                                         'keep *_hgcalLayerClusters_*_*',
+                                                         'drop DetIdfloatstdmap_hgcalLayerClusters_*_*',
+                                                         'keep *_hgcalMultiClusters_*_*',
+                                                         'keep *_iterHGCalMultiClusters_*_*'] )
 # don't modify AOD for HGCal yet, need "reduced" rechits collection first (i.e. requires reconstruction)
-phase2_hgcal.toModify( RecoLocalCaloAOD, outputCommands = RecoLocalCaloAOD.outputCommands + ['keep *_HGCalRecHit_*_*','keep *_hgcalLayerClusters_*_*'] )
+phase2_hgcal.toModify( RecoLocalCaloAOD,
+    outputCommands = RecoLocalCaloAOD.outputCommands + ['keep *_HGCalRecHit_*_*',
+                                                        'keep *_hgcalLayerClusters_*_*',
+                                                        'drop DetIdfloatstdmap_hgcalLayerClusters_*_*'])
 
 from Configuration.Eras.Modifier_pA_2016_cff import pA_2016
 from Configuration.Eras.Modifier_pp_on_AA_2018_cff import pp_on_AA_2018
@@ -87,3 +97,13 @@ from Configuration.Eras.Modifier_pp_on_AA_2018_cff import pp_on_AA_2018
                                                                      'keep QIE10DataFrameHcalDataFrameContainer_hcalDigis_ZDC_*'
                                                                      ])
                   )
+
+from Configuration.ProcessModifiers.egamma_lowPt_exclusive_cff import egamma_lowPt_exclusive
+egamma_lowPt_exclusive.toModify( RecoLocalCaloAOD,
+    outputCommands = RecoLocalCaloAOD.outputCommands + ['keep *_towerMaker_*_*',
+						        'keep *_zdcreco_*_*',
+                                                        'keep ZDCDataFramesSorted_hcalDigis_*_*',
+                                                        'keep ZDCDataFramesSorted_castorDigis_*_*',
+                                                        'keep QIE10DataFrameHcalDataFrameContainer_hcalDigis_ZDC_*'])
+
+

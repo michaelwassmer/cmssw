@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from builtins import range
 import os
 import copy
 import collections
@@ -370,7 +371,9 @@ _tuning = PlotGroup("tuning", [
     Plot("chi2_prob", stat=True, normalizeToUnitArea=True, drawStyle="hist", xtitle="Prob(#chi^{2})"),
     Plot("chi2mean", title="", xtitle="#eta", ytitle="< #chi^{2} / ndf >", ymin=[0, 0.5], ymax=[2, 2.5, 3, 5],
          fallback={"name": "chi2_vs_eta", "profileX": True}),
-    Plot("ptres_vs_eta_Mean", scale=100, title="", xtitle="TP #eta (PCA to beamline)", ytitle="< #delta p_{T} / p_{T} > (%)", ymin=_minResidualPt, ymax=_maxResidualPt)
+    Plot("ptres_vs_eta_Mean", scale=100, title="", xtitle="TP #eta (PCA to beamline)", ytitle="< #delta p_{T} / p_{T} > (%)", ymin=_minResidualPt, ymax=_maxResidualPt),
+    Plot("chi2mean_vs_pt", title="", xtitle="p_{T}", ytitle="< #chi^{2} / ndf >", ymin=[0, 0.5], ymax=[2, 2.5, 3, 5], xlog=True, fallback={"name": "chi2_vs_pt", "profileX": True}),
+    Plot("ptres_vs_pt_Mean", title="", xtitle="p_{T}", ytitle="< #delta p_{T}/p_{T} > (%)", scale=100, ymin=_minResidualPt, ymax=_maxResidualPt,xlog=True)
 ])
 _common = {"stat": True, "fit": True, "normalizeToUnitArea": True, "drawStyle": "hist", "drawCommand": "", "xmin": -10, "xmax": 10, "ylog": True, "ymin": 5e-5, "ymax": [0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1.025], "ratioUncertainty": False}
 _pulls = PlotGroup("pulls", [
@@ -1076,7 +1079,7 @@ class TrackingSeedingLayerTable:
         legendLabels = legendLabels[:]
         if max(map(len, legendLabels)) > 20:
             haveShortLabels = True
-            labels_short = [str(chr(ord('A')+i)) for i in xrange(len(legendLabels))]
+            labels_short = [str(chr(ord('A')+i)) for i in range(len(legendLabels))]
             for i, ls in enumerate(labels_short):
                 legendLabels[i] = "%s: %s" % (ls, legendLabels[i])
         else:
@@ -1130,7 +1133,7 @@ class TrackingSeedingLayerTable:
         if len(histos_linear) == 0:
             return []
 
-        data = [ [h.GetBinContent(i) for i in xrange(1, h.GetNbinsX()+1)] for h in histos_linear]
+        data = [ [h.GetBinContent(i) for i in range(1, h.GetNbinsX()+1)] for h in histos_linear]
         table = html.Table(["dummy"]*len(histos_linear), xbinlabels, data, None, None, None)
         data = table.tableAsRowColumn()
 
@@ -1464,6 +1467,9 @@ _iterations = [
                          "initialStepClassifier3",
                          "initialStep",
                          "initialStepSelector"],
+              building=["initialStepTrackCandidatesMkFitInput",
+                        "initialStepTrackCandidatesMkFit",
+                        "initialStepTrackCandidates"],
               other=["firstStepPrimaryVerticesUnsorted",
                      "initialStepTrackRefsForJets",
                      "caloTowerForTrk",
@@ -1637,7 +1643,7 @@ class TimePerEventPlot:
 
         ret = timeTh1.Clone(self._name)
         xaxis = ret.GetXaxis()
-        for i in xrange(1, ret.GetNbinsX()+1):
+        for i in range(1, ret.GetNbinsX()+1):
             ret.SetBinContent(i, ret.GetBinContent(i)/nevents)
             ret.SetBinError(i, ret.GetBinError(i)/nevents)
             xaxis.SetBinLabel(i, xaxis.GetBinLabel(i).replace(" (unscheduled)", ""))
@@ -1689,12 +1695,12 @@ class TimePerTrackPlot:
         if h_reco_per_iter is None:
             return None
         values = {}
-        for i in xrange(1, h_reco_per_iter.GetNbinsX()+1):
+        for i in range(1, h_reco_per_iter.GetNbinsX()+1):
             values[h_reco_per_iter.GetXaxis().GetBinLabel(i)] = h_reco_per_iter.GetBinContent(i)
 
 
         result = []
-        for i in xrange(1, timeTh1.GetNbinsX()+1):
+        for i in range(1, timeTh1.GetNbinsX()+1):
             iterName = timeTh1.GetXaxis().GetBinLabel(i)
             if iterName in values:
                 ntrk = values[iterName]
@@ -1726,10 +1732,10 @@ class TrackingIterationOrder:
             # remove "Tracks" from the track producer name to get the iteration name
             # muonSeeded iterations do not have "Step" in the producer name, so add it here
             return s.replace("Tracks", "").replace("muonSeeded", "muonSeededStep")
-        return [_edit(xaxis.GetBinLabel(i)) for i in xrange(1, h.GetNbinsX()+1)]
+        return [_edit(xaxis.GetBinLabel(i)) for i in range(1, h.GetNbinsX()+1)]
 
     def __call__(self, tdirectory, labels):
-        ret = range(0, len(labels))
+        ret = list(range(0, len(labels)))
         f = tdirectory.GetFile()
         if not f:
             return ret
