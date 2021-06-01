@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import print_function
 import sys
 import numpy
@@ -66,6 +66,7 @@ if 'Indices;1' in things:
 elif 'DQMData;1' in things:
   basedir = f['DQMData']
   for run in basedir.keys():
+    if not run.startswith("Run "): continue
     rundir = basedir[run]
     print("MEs for %s" % run)
     for me in args.mepaths:

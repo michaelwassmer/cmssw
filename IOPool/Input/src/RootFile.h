@@ -29,6 +29,7 @@ RootFile.h // used by ROOT input sources
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace edm {
@@ -91,7 +92,8 @@ namespace edm {
              bool bypassVersionCheck,
              bool labelRawDataLikeMC,
              bool usingGoToEvent,
-             bool enablePrefetching);
+             bool enablePrefetching,
+             bool enforceGUIDInFileName);
 
     RootFile(std::string const& fileName,
              ProcessConfiguration const& processConfiguration,
@@ -113,7 +115,8 @@ namespace edm {
              std::vector<ProcessHistoryID>& orderedProcessHistoryIDs,
              bool bypassVersionCheck,
              bool labelRawDataLikeMC,
-             bool enablePrefetching)
+             bool enablePrefetching,
+             bool enforceGUIDInFileName)
         : RootFile(fileName,
                    processConfiguration,
                    logicalFileName,
@@ -142,7 +145,8 @@ namespace edm {
                    bypassVersionCheck,
                    labelRawDataLikeMC,
                    false,
-                   enablePrefetching) {}
+                   enablePrefetching,
+                   enforceGUIDInFileName) {}
 
     RootFile(std::string const& fileName,
              ProcessConfiguration const& processConfiguration,
@@ -159,7 +163,8 @@ namespace edm {
              std::vector<std::shared_ptr<IndexIntoFile>>::size_type currentIndexIntoFile,
              std::vector<ProcessHistoryID>& orderedProcessHistoryIDs,
              bool bypassVersionCheck,
-             bool enablePrefetching)
+             bool enablePrefetching,
+             bool enforceGUIDInFileName)
         : RootFile(fileName,
                    processConfiguration,
                    logicalFileName,
@@ -188,7 +193,8 @@ namespace edm {
                    bypassVersionCheck,
                    false,
                    false,
-                   enablePrefetching) {}
+                   enablePrefetching,
+                   enforceGUIDInFileName) {}
 
     ~RootFile();
 
@@ -197,8 +203,8 @@ namespace edm {
 
     void reportOpened(std::string const& inputType);
     void close();
-    bool readCurrentEvent(EventPrincipal& cache);
-    void readEvent(EventPrincipal& cache);
+    std::tuple<bool, bool> readCurrentEvent(EventPrincipal& cache, bool assertOnFailure = true);
+    bool readEvent(EventPrincipal& cache);
 
     std::shared_ptr<LuminosityBlockAuxiliary> readLuminosityBlockAuxiliary_();
     std::shared_ptr<RunAuxiliary> readRunAuxiliary_();
@@ -208,11 +214,9 @@ namespace edm {
     void readLuminosityBlock_(LuminosityBlockPrincipal& lumiPrincipal);
     std::string const& file() const { return file_; }
     std::shared_ptr<ProductRegistry const> productRegistry() const { return productRegistry_; }
-    EventAuxiliary const& eventAux() const { return eventAux_; }
     // IndexIntoFile::EntryNumber_t const& entryNumber() const {return indexIntoFileIter().entry();}
     // LuminosityBlockNumber_t const& luminosityBlockNumber() const {return indexIntoFileIter().lumi();}
     // RunNumber_t const& runNumber() const {return indexIntoFileIter().run();}
-    EventID const& eventID() const { return eventAux().id(); }
     RootTree const& eventTree() const { return eventTree_; }
     RootTree const& lumiTree() const { return lumiTree_; }
     RootTree const& runTree() const { return runTree_; }
@@ -269,9 +273,12 @@ namespace edm {
     void setIfFastClonable(int remainingEvents, int remainingLumis);
     void validateFile(InputType inputType, bool usingGoToEvent);
     void fillIndexIntoFile();
-    bool fillEventAuxiliary(IndexIntoFile::EntryNumber_t entry);
-    void fillThisEventAuxiliary();
-    void fillEventHistory();
+    EventAuxiliary fillEventAuxiliary(IndexIntoFile::EntryNumber_t entry);
+    EventAuxiliary const& fillThisEventAuxiliary();
+    bool fillEventHistory(EventAuxiliary& evtAux,
+                          EventSelectionIDVector& eventSelectionIDs,
+                          BranchListIndexes& branchListIndexes,
+                          bool assertOnFailure = true);
     std::shared_ptr<LuminosityBlockAuxiliary> fillLumiAuxiliary();
     std::shared_ptr<RunAuxiliary> fillRunAuxiliary();
     std::string const& newBranchToOldBranch(std::string const& newBranch) const;
@@ -325,14 +332,16 @@ namespace edm {
     edm::propagate_const<std::shared_ptr<RunAuxiliary>> savedRunAuxiliary_;
     bool skipAnyEvents_;
     bool noEventSort_;
+    bool enforceGUIDInFileName_;
     int whyNotFastClonable_;
     std::array<bool, NumBranchTypes> hasNewlyDroppedBranch_;
     bool branchListIndexesUnchanged_;
-    EventAuxiliary eventAux_;
+    EventAuxiliary eventAuxCache_;  //Should only be used by fillThisEventAuxiliary()
     RootTree eventTree_;
     RootTree lumiTree_;
     RootTree runTree_;
     RootTreePtrArray treePointers_;
+    //Should only be used by fillThisEventAuxiliary()
     IndexIntoFile::EntryNumber_t lastEventEntryNumberRead_;
     std::shared_ptr<ProductRegistry const> productRegistry_;
     std::shared_ptr<BranchIDLists const> branchIDLists_;
@@ -342,9 +351,7 @@ namespace edm {
     InputSource::ProcessingMode processingMode_;
     edm::propagate_const<RunHelperBase*> runHelper_;
     std::map<std::string, std::string> newBranchToOldBranch_;
-    edm::propagate_const<TTree*> eventHistoryTree_;  // backward compatibility
-    EventSelectionIDVector eventSelectionIDs_;
-    BranchListIndexes branchListIndexes_;
+    edm::propagate_const<TTree*> eventHistoryTree_;           // backward compatibility
     edm::propagate_const<std::unique_ptr<History>> history_;  // backward compatibility
     edm::propagate_const<std::shared_ptr<BranchChildren>> branchChildren_;
     edm::propagate_const<std::shared_ptr<DuplicateChecker>> duplicateChecker_;

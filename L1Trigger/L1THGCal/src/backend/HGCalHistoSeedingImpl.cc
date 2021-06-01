@@ -12,7 +12,9 @@ HGCalHistoSeedingImpl::HGCalHistoSeedingImpl(const edm::ParameterSet& conf)
       histoThreshold_(conf.getParameter<double>("threshold_histo_multicluster")),
       neighbour_weights_(conf.getParameter<std::vector<double>>("neighbour_weights")),
       smoothing_ecal_(conf.getParameter<std::vector<double>>("seed_smoothing_ecal")),
-      smoothing_hcal_(conf.getParameter<std::vector<double>>("seed_smoothing_hcal")) {
+      smoothing_hcal_(conf.getParameter<std::vector<double>>("seed_smoothing_hcal")),
+      kROverZMin_(conf.getParameter<double>("kROverZMin")),
+      kROverZMax_(conf.getParameter<double>("kROverZMax")) {
   if (seedingAlgoType_ == "HistoMaxC3d") {
     seedingType_ = HistoMaxC3d;
   } else if (seedingAlgoType_ == "HistoSecondaryMaxC3d") {
@@ -164,12 +166,12 @@ HGCalHistoSeedingImpl::Histogram HGCalHistoSeedingImpl::fillSmoothPhiHistoCluste
   for (int z_side : {-1, 1}) {
     for (unsigned bin1 = 0; bin1 < nBins1_; bin1++) {
       int nBinsSide = (binSums[bin1] - 1) / 2;
-      float R1 = kROverZMin_ + bin1 * (kROverZMax_ - kROverZMin_);
-      float R2 = R1 + (kROverZMax_ - kROverZMin_);
+      float R1 = kROverZMin_ + bin1 * (kROverZMax_ - kROverZMin_) / nBins1_;
+      float R2 = R1 + ((kROverZMax_ - kROverZMin_) / nBins1_);
       double area =
-          0.5 * (pow(R2, 2) - pow(R1, 2)) *
+          ((M_PI * (pow(R2, 2) - pow(R1, 2))) / nBins2_) *
           (1 +
-           0.5 *
+           2.0 *
                (1 -
                 pow(0.5,
                     nBinsSide)));  // Takes into account different area of bins in different R-rings + sum of quadratic weights used
@@ -194,7 +196,7 @@ HGCalHistoSeedingImpl::Histogram HGCalHistoSeedingImpl::fillSmoothPhiHistoCluste
         }
 
         auto& bin = histoSumPhiClusters.at(z_side, bin1, bin2);
-        bin.values[Bin::Content::Sum] = content / area;
+        bin.values[Bin::Content::Sum] = (content / area) * area_per_triggercell_;
         bin.weighted_x = bin_orig.weighted_x;
         bin.weighted_y = bin_orig.weighted_y;
       }

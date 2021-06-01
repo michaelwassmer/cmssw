@@ -12,17 +12,16 @@ PFRecHitProducer::PFRecHitProducer(const edm::ParameterSet& iConfig) {
   produces<reco::PFRecHitCollection>();
   produces<reco::PFRecHitCollection>("Cleaned");
 
-  edm::ConsumesCollector iC = consumesCollector();
+  edm::ConsumesCollector cc = consumesCollector();
 
   std::vector<edm::ParameterSet> creators = iConfig.getParameter<std::vector<edm::ParameterSet> >("producers");
   for (auto& creator : creators) {
     std::string name = creator.getParameter<std::string>("name");
-    creators_.emplace_back(PFRecHitFactory::get()->create(name, creator, iC));
+    creators_.emplace_back(PFRecHitFactory::get()->create(name, creator, cc));
   }
 
   edm::ParameterSet navSet = iConfig.getParameter<edm::ParameterSet>("navigator");
-
-  navigator_ = PFRecHitNavigationFactory::get()->create(navSet.getParameter<std::string>("name"), navSet);
+  navigator_ = PFRecHitNavigationFactory::get()->create(navSet.getParameter<std::string>("name"), navSet, cc);
 }
 
 PFRecHitProducer::~PFRecHitProducer() = default;
@@ -35,6 +34,7 @@ void PFRecHitProducer::beginLuminosityBlock(edm::LuminosityBlock const& iLumi, c
   for (const auto& creator : creators_) {
     creator->init(iSetup);
   }
+  navigator_->init(iSetup);
 }
 
 void PFRecHitProducer::endLuminosityBlock(edm::LuminosityBlock const& iLumi, const edm::EventSetup&) {}
@@ -44,8 +44,6 @@ void PFRecHitProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup
   using namespace edm;
   auto out = std::make_unique<reco::PFRecHitCollection>();
   auto cleaned = std::make_unique<reco::PFRecHitCollection>();
-
-  navigator_->beginEvent(iSetup);
 
   out->reserve(localRA1.upper());
   cleaned->reserve(localRA2.upper());
