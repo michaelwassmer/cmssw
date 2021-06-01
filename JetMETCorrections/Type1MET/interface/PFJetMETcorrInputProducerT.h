@@ -66,9 +66,24 @@ namespace PFJetMETcorrInputProducer_namespace
      RawJetExtractorT(){}
      reco::Candidate::LorentzVector operator()(const T& jet) const
      {
+       //std::cout << "getting uncorrected jet in main template" << std::endl;
        return jet.p4();
      }
   };
+  
+  template <typename T>
+  class RetrieveJerT
+  {
+    public:
+    
+      RetrieveJerT(){}
+      float operator()(const T& jet) const
+      {
+        //std::cout << "retrieving JER smear factor in main template: 1.0" << std::endl;
+        return 1.0;
+      }
+  };
+        
 
 }
 
@@ -181,6 +196,10 @@ class PFJetMETcorrInputProducerT : public edm::stream::EDProducer<>
     int numJets = jets->size();
     for ( int jetIndex = 0; jetIndex < numJets; ++jetIndex ) {
       const T& jet = jets->at(jetIndex);
+      //std::cout << "test" << std::endl;
+      //if(jet.hasUserFloat("SmearFactor")){
+      //    std::cout << "SmearFactor 1: " << jet.userFloat("SmearFactor") << std::endl;
+      //}
 
       const static PFJetMETcorrInputProducer_namespace::InputTypeCheckerT<T, Textractor> checkInputType {};
       checkInputType(jet);
@@ -210,6 +229,10 @@ class PFJetMETcorrInputProducerT : public edm::stream::EDProducer<>
       else
         corrJetP4 = jetCorrExtractor_(jet, jetCorr.product(), jetCorrEtaMax_, &rawJetP4);
       
+      const static PFJetMETcorrInputProducer_namespace::RetrieveJerT<T> retrieveJER{};
+      corrJetP4*=retrieveJER(jet);
+      //std::cout << "reapplied JER smear factor " << retrieveJER(jet) << std::endl;
+      
       if ( corrJetP4.pt() > type1JetPtThreshold_ ) {
 
 	reco::Candidate::LorentzVector rawJetP4offsetCorr = rawJetP4;
@@ -230,6 +253,12 @@ class PFJetMETcorrInputProducerT : public edm::stream::EDProducer<>
 	    }
 	  }
 	}
+	
+	//if(jet.hasUserFloat("SmearFactor")){
+	    //std::cout << "before: " << rawJetP4offsetCorr.Et() << std::endl;
+	    //rawJetP4offsetCorr*=(1.0/jet.userFloat("SmearFactor"));
+	    //std::cout << "after: " << rawJetP4offsetCorr.Et() << std::endl;
+	//}
 
 //--- MET balances momentum of reconstructed particles,
 //    hence correction to jets and corresponding Type 1 MET correction are of opposite sign

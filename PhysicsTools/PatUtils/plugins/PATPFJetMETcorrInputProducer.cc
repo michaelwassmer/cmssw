@@ -31,9 +31,33 @@ namespace PFJetMETcorrInputProducer_namespace
      RawJetExtractorT(){}
      reco::Candidate::LorentzVector operator()(const pat::Jet& jet) const
      {
-       if ( jet.jecSetsAvailable() ) return jet.correctedP4("Uncorrected");
-       else return jet.p4();
+       //std::cout << "getting uncorrected jet in specialized template" << std::endl;
+       reco::Candidate::LorentzVector uncorrected_jet;
+       if ( jet.jecSetsAvailable() ) uncorrected_jet = jet.correctedP4("Uncorrected");
+       else uncorrected_jet = jet.p4();
+       if(jet.hasUserFloat("SmearFactor")) {
+           uncorrected_jet*=(1.0/jet.userFloat("SmearFactor"));
+           //std::cout << "removed JER smear factor " << jet.userFloat("SmearFactor") << std::endl;
+       }
+       return uncorrected_jet;
      }
+  };
+  
+  template <>
+  class RetrieveJerT<pat::Jet>
+  {
+    public:
+    
+      RetrieveJerT(){}
+      float operator()(const pat::Jet& jet) const
+      {
+        //std::cout << "retrieving JER in specialized template" << std::endl;
+        if(jet.hasUserFloat("SmearFactor")) {
+            //std::cout << "returning JER smear factor" << jet.userFloat("SmearFactor") << std::endl;
+            return jet.userFloat("SmearFactor");
+        }
+        else return 1.0;
+      } 
   };
 }
 

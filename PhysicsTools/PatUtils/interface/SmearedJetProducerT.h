@@ -173,6 +173,7 @@ public:
   }
 
   void produce(edm::Event& event, const edm::EventSetup& setup) override {
+    // if (m_debug) std::cout << "==================================================================================================" << std::endl;
     edm::Handle<JetCollection> jets_collection;
     event.getByToken(m_jets_token, jets_collection);
 
@@ -228,6 +229,9 @@ public:
       double jer_sf = resolution_sf.getScaleFactor({{JME::Binning::JetPt, jet.pt()}, {JME::Binning::JetEta, jet.eta()}},
                                                    m_systematic_variation);
       if (m_debug) {
+        // std::cout << "--------------------------------------------------------------------------------" << std::endl;
+        // std::cout << "variation: " << int(m_systematic_variation) << std::endl;
+        // std::cout << "nomVar: " << m_nomVar << std::endl;
         std::cout << "jet:  pt: " << jet.pt() << "  eta: " << jet.eta() << "  phi: " << jet.phi()
                   << "  e: " << jet.energy() << std::endl;
         std::cout << "resolution: " << jet_resolution << std::endl;
@@ -282,7 +286,11 @@ public:
       }
 
       T smearedJet = jet;
-      smearedJet.scaleEnergy(smearFactor);
+      // smearedJet.scaleEnergy(smearFactor);
+      // smearedJet.addUserFloat("SmearFactor",smearFactor);
+      // std::cout << "SmearFactor 1: " << smearedJet.userFloat("SmearFactor") << std::endl;
+      SmearedJetProducer_namespace::SmearJet(smearedJet,smearFactor);
+      
 
       if (m_debug) {
         std::cout << "smeared jet (" << smearFactor << "):  pt: " << smearedJet.pt() << "  eta: " << smearedJet.eta()
