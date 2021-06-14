@@ -23,6 +23,8 @@ namespace PFJetMETcorrInputProducer_namespace
      }
   };
 
+  // template specialization for pat::Jets
+  // remove JER correction if JER factor was saved as userFloat previously
   template <>
   class RawJetExtractorT<pat::Jet>
   {
@@ -31,18 +33,19 @@ namespace PFJetMETcorrInputProducer_namespace
      RawJetExtractorT(){}
      reco::Candidate::LorentzVector operator()(const pat::Jet& jet) const
      {
-       //std::cout << "getting uncorrected jet in specialized template" << std::endl;
        reco::Candidate::LorentzVector uncorrected_jet;
        if ( jet.jecSetsAvailable() ) uncorrected_jet = jet.correctedP4("Uncorrected");
        else uncorrected_jet = jet.p4();
        if(jet.hasUserFloat("SmearFactor")) {
            uncorrected_jet*=(1.0/jet.userFloat("SmearFactor"));
-           //std::cout << "removed JER smear factor " << jet.userFloat("SmearFactor") << std::endl;
        }
        return uncorrected_jet;
      }
   };
   
+  // template specialization for pat::Jets
+  // retrieve JER factor if it was saved previously
+  // otherwise just return 1
   template <>
   class RetrieveJerT<pat::Jet>
   {
@@ -51,9 +54,7 @@ namespace PFJetMETcorrInputProducer_namespace
       RetrieveJerT(){}
       float operator()(const pat::Jet& jet) const
       {
-        //std::cout << "retrieving JER in specialized template" << std::endl;
         if(jet.hasUserFloat("SmearFactor")) {
-            //std::cout << "returning JER smear factor" << jet.userFloat("SmearFactor") << std::endl;
             return jet.userFloat("SmearFactor");
         }
         else return 1.0;

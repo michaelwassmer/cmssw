@@ -4,17 +4,16 @@
 #include "DataFormats/PatCandidates/interface/Jet.h"
 
 namespace SmearedJetProducer_namespace {
+    // template function to apply JER
     template <typename T>
     void SmearJet(T& jet, float smearfactor) {
-        //std::cout << "smearing jet in main template with smear factor " << smearfactor << std::endl;
         jet.scaleEnergy(smearfactor);
     }
     
+    // template specialization for pat::Jets to store the JER factor
     template <>
     void SmearJet<pat::Jet>(pat::Jet& jet, float smearfactor) {
-        //std::cout << "smearing jet in specialized template with smear factor " << smearfactor << std::endl;
         jet.scaleEnergy(smearfactor);
-        //std::cout << "storing smear factor " << smearfactor << " in specialized template" << std::endl;
         jet.addUserFloat("SmearFactor",smearfactor);
     }
 }
