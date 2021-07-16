@@ -287,7 +287,7 @@ def writeDocReport(fileData, stream):
     <table>
     """.format(filename=fileData.filename))
     stream.write( "<tr class='header'><th>Collection</th><th>Description</th></tr>\n" )
-    groups = fileData.Events['branchgroups'].values()
+    groups = list(fileData.Events['branchgroups'].values())
     groups.sort(key = lambda s : s['name'])
     for s in groups:
         stream.write( "<th><a href='#%s'>%s</a></th><td style='text-align : left;'>%s</td></tr>\n" % (s['name'],s['name'],s['doc']) )
