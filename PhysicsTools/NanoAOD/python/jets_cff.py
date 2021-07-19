@@ -1,9 +1,8 @@
 import FWCore.ParameterSet.Config as cms
-
 from PhysicsTools.NanoAOD.nano_eras_cff import *
-from  PhysicsTools.NanoAOD.common_cff import *
-from RecoJets.JetProducers.ak4PFJetsBetaStar_cfi import *
+from PhysicsTools.NanoAOD.common_cff import *
 
+from RecoJets.JetProducers.ak4PFJetsBetaStar_cfi import *
 
 ##################### User floats producers, selectors ##########################
 from RecoJets.JetProducers.ak4PFJets_cfi import ak4PFJets
@@ -103,6 +102,7 @@ tightJetIdLepVetoAK8 = cms.EDProducer("PatJetIDValueMapProducer",
 			  ),
                           src = cms.InputTag("updatedJetsAK8")
 )
+
 run2_jme_2016.toModify( tightJetIdAK8.filterParams, version = "RUN2UL16PUPPI" )
 run2_jme_2016.toModify( tightJetIdLepVetoAK8.filterParams, version = "RUN2UL16PUPPI" )
 for modifier in run2_miniAOD_80XLegacy, run2_nanoAOD_94X2016:
@@ -207,7 +207,6 @@ lepInJetVars = cms.EDProducer("LepInJetProducer",
 ##################### Tables for final output and docs ##########################
 
 
-
 jetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
     src = cms.InputTag("linkedObjects","jets"),
     cut = cms.string(""), #we should not filter on cross linked collections
@@ -254,6 +253,13 @@ jetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
         muEF = Var("muonEnergyFraction()", float, doc="muon Energy Fraction", precision= 6),
         chFPV0EF = Var("userFloat('chFPV0EF')", float, doc="charged fromPV==0 Energy Fraction (energy excluded from CHS jets). Previously called betastar.", precision= 6),
     )
+)
+
+run3_nanoAOD_devel.toModify(jetTable.externalVariables,
+                            bRegCorr = None,
+                            bRegRes  = None,
+                            cRegCorr = None,
+                            cRegRes  = None
 )
 
 #jets are not as precise as muons
@@ -492,6 +498,7 @@ fatJetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
         electronIdx3SJ = ExtVar(cms.InputTag("lepInJetVars:eleIdx3SJ"),int,doc="index of electron matched to jet"),
     )
 )
+
 ### Era dependent customization
 for modifier in run2_miniAOD_80XLegacy, run2_nanoAOD_94X2016, run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2, run2_nanoAOD_102Xv1, run2_nanoAOD_106Xv1:
   modifier.toModify( fatJetTable.variables.n2b1, expr = cms.string("userFloat('ak8PFJetsPuppiSoftDropValueMap:nb1AK8PuppiSoftDropN2')"),)
@@ -611,7 +618,7 @@ genJetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
 	#anything else?
     )
 )
-patJetPartons = cms.EDProducer('HadronAndPartonSelector',
+patJetPartonsNano = cms.EDProducer('HadronAndPartonSelector',
     src = cms.InputTag("generator"),
     particles = cms.InputTag("prunedGenParticles"),
     partonMode = cms.string("Auto"),
@@ -619,10 +626,10 @@ patJetPartons = cms.EDProducer('HadronAndPartonSelector',
 )
 genJetFlavourAssociation = cms.EDProducer("JetFlavourClustering",
     jets = genJetTable.src,
-    bHadrons = cms.InputTag("patJetPartons","bHadrons"),
-    cHadrons = cms.InputTag("patJetPartons","cHadrons"),
-    partons = cms.InputTag("patJetPartons","physicsPartons"),
-    leptons = cms.InputTag("patJetPartons","leptons"),
+    bHadrons = cms.InputTag("patJetPartonsNano","bHadrons"),
+    cHadrons = cms.InputTag("patJetPartonsNano","cHadrons"),
+    partons = cms.InputTag("patJetPartonsNano","physicsPartons"),
+    leptons = cms.InputTag("patJetPartonsNano","leptons"),
     jetAlgorithm = cms.string("AntiKt"),
     rParam = cms.double(0.4),
     ghostRescaling = cms.double(1e-18),
@@ -649,10 +656,10 @@ genJetAK8Table = cms.EDProducer("SimpleCandidateFlatTableProducer",
 )
 genJetAK8FlavourAssociation = cms.EDProducer("JetFlavourClustering",
     jets = genJetAK8Table.src,
-    bHadrons = cms.InputTag("patJetPartons","bHadrons"),
-    cHadrons = cms.InputTag("patJetPartons","cHadrons"),
-    partons = cms.InputTag("patJetPartons","physicsPartons"),
-    leptons = cms.InputTag("patJetPartons","leptons"),
+    bHadrons = cms.InputTag("patJetPartonsNano","bHadrons"),
+    cHadrons = cms.InputTag("patJetPartonsNano","cHadrons"),
+    partons = cms.InputTag("patJetPartonsNano","physicsPartons"),
+    leptons = cms.InputTag("patJetPartonsNano","leptons"),
     jetAlgorithm = cms.string("AntiKt"),
     rParam = cms.double(0.8),
     ghostRescaling = cms.double(1e-18),
@@ -709,7 +716,6 @@ run2_miniAOD_80XLegacy.toModify( genJetFlavourTable, jetFlavourInfos = cms.Input
 from RecoJets.JetProducers.QGTagger_cfi import  QGTagger
 qgtagger=QGTagger.clone(srcJets="updatedJets",srcVertexCollection="offlineSlimmedPrimaryVertices")
 
-
 from RecoJets.JetProducers.PileupJetID_cfi import pileupJetId, _chsalgos_94x, _chsalgos_102x, _chsalgos_106X_UL16, _chsalgos_106X_UL16APV, _chsalgos_106X_UL17, _chsalgos_106X_UL18
 pileupJetId94X=pileupJetId.clone(jets="updatedJets",algos = cms.VPSet(_chsalgos_94x),inputIsCorrected=True,applyJec=False,vertexes="offlineSlimmedPrimaryVertices")
 pileupJetId102X=pileupJetId.clone(jets="updatedJets",algos = cms.VPSet(_chsalgos_102x),inputIsCorrected=True,applyJec=False,vertexes="offlineSlimmedPrimaryVertices")
@@ -719,14 +725,16 @@ pileupJetId106XUL17=pileupJetId.clone(jets="updatedJets",algos = cms.VPSet(_chsa
 pileupJetId106XUL18=pileupJetId.clone(jets="updatedJets",algos = cms.VPSet(_chsalgos_106X_UL18),inputIsCorrected=True,applyJec=False,vertexes="offlineSlimmedPrimaryVertices")
 
 #before cross linking
-jetSequence = cms.Sequence(jetCorrFactorsNano+updatedJets+tightJetId+tightJetIdLepVeto+bJetVars+qgtagger+jercVars+pileupJetId94X+pileupJetId102X+pileupJetId106XUL16+pileupJetId106XUL16APV+pileupJetId106XUL17+pileupJetId106XUL18+updatedJetsWithUserData+jetCorrFactorsAK8+updatedJetsAK8+tightJetIdAK8+tightJetIdLepVetoAK8+updatedJetsAK8WithUserData+chsForSATkJets+softActivityJets+softActivityJets2+softActivityJets5+softActivityJets10+finalJets+finalJetsAK8)
+jetUserDataTask = cms.Task(bJetVars, qgtagger, jercVars, tightJetId, tightJetIdLepVeto, pileupJetId94X, pileupJetId102X, pileupJetId106XUL16,pileupJetId106XUL16APV,pileupJetId106XUL17,pileupJetId106XUL18)
 
+jetAK8UserDataTask = cms.Task(tightJetIdAK8,tightJetIdLepVetoAK8)
 
-_jetSequence_2016 = jetSequence.copy()
-_jetSequence_2016.insert(_jetSequence_2016.index(tightJetId), looseJetId)
-_jetSequence_2016.insert(_jetSequence_2016.index(tightJetIdAK8), looseJetIdAK8)
+_jetUserDataTask2016 = jetUserDataTask.copy()
+_jetUserDataTask2016.add(looseJetId,looseJetIdAK8)
 for modifier in run2_miniAOD_80XLegacy, run2_nanoAOD_94X2016:
-  modifier.toReplaceWith(jetSequence, _jetSequence_2016)
+  modifier.toReplaceWith(jetUserDataTask,_jetUserDataTask2016)
+
+softActivityTask = cms.Task(chsForSATkJets,softActivityJets,softActivityJets2,softActivityJets5,softActivityJets10) 
 
 #HF shower shape recomputation
 #Only run if needed (i.e. if default MINIAOD info is missing or outdated because of new JECs...)
@@ -745,22 +753,32 @@ for modifier in run2_miniAOD_80XLegacy, run2_nanoAOD_94X2016, run2_nanoAOD_94XMi
   modifier.toModify( jetTable.variables, hfsigmaPhiPhi = Var("userFloat('hfsigmaPhiPhi')",float,doc="sigmaPhiPhi for HF jets (noise discriminating variable)",precision=10))
   modifier.toModify( jetTable.variables, hfcentralEtaStripSize = Var("userInt('hfcentralEtaStripSize')", int, doc="eta size of the central tower strip in HF (noise discriminating variable) "))
   modifier.toModify( jetTable.variables, hfadjacentEtaStripsSize = Var("userInt('hfadjacentEtaStripsSize')", int, doc="eta size of the strips next to the central tower strip in HF (noise discriminating variable) "))
-  _jetSequence_rerunHFshowershape = jetSequence.copy()
-  _jetSequence_rerunHFshowershape.insert(_jetSequence_rerunHFshowershape.index(updatedJetsWithUserData), hfJetShowerShapeforNanoAOD)
-  modifier.toReplaceWith(jetSequence, _jetSequence_rerunHFshowershape)
 
+
+################################################################################
+# Tasks
+################################################################################
+
+#before cross linking
+jetTask = cms.Task(jetCorrFactorsNano,updatedJets,jetUserDataTask,updatedJetsWithUserData,hfJetShowerShapeforNanoAOD,jetCorrFactorsAK8,updatedJetsAK8,jetAK8UserDataTask,updatedJetsAK8WithUserData,softActivityTask,finalJets,finalJetsAK8)
 
 #after lepton collections have been run
-jetLepSequence = cms.Sequence(lepInJetVars)
+jetLepTask = cms.Task(lepInJetVars)
 
 #after cross linkining
-jetTables = cms.Sequence(bjetNN+cjetNN+jetTable+fatJetTable+subJetTable+saJetTable+saTable)
+jetTablesTask = cms.Task(bjetNN,cjetNN,jetTable,fatJetTable,subJetTable,saJetTable,saTable)
+(run3_nanoAOD_devel).toReplaceWith(jetTablesTask, jetTablesTask.copyAndExclude([bjetNN,cjetNN]))
 
 #MC only producers and tables
-jetMC = cms.Sequence(jetMCTable+genJetTable+patJetPartons+genJetFlavourTable+genJetAK8Table+genJetAK8FlavourAssociation+genJetAK8FlavourTable+fatJetMCTable+genSubJetAK8Table+subjetMCTable)
-_jetMC_pre94X = jetMC.copy()
-_jetMC_pre94X.insert(_jetMC_pre94X.index(genJetFlavourTable),genJetFlavourAssociation)
-_jetMC_pre94X.remove(genSubJetAK8Table)
-run2_miniAOD_80XLegacy.toReplaceWith(jetMC, _jetMC_pre94X)
+jetMCTaskak4 = cms.Task(jetMCTable,genJetTable,patJetPartonsNano,genJetFlavourTable,genJetAK8Table,genJetAK8FlavourAssociation,genJetAK8FlavourTable,fatJetMCTable,genSubJetAK8Table,subjetMCTable)
+jetMCTaskak8 = cms.Task(genJetAK8Table,genJetAK8FlavourAssociation,genJetAK8FlavourTable,fatJetMCTable,genSubJetAK8Table,subjetMCTable)
+jetMCTask = jetMCTaskak4.copy()
+jetMCTask.add(jetMCTaskak8)
+
+_jetMC_pre94XTask = jetMCTaskak4.copy()
+_jetMC_pre94XTask.add(genJetFlavourAssociation)
+_jetMC_pre94XTask.add(jetMCTaskak8)
+_jetMC_pre94XTask.copyAndExclude([genSubJetAK8Table])
+run2_miniAOD_80XLegacy.toReplaceWith(jetMCTask, _jetMC_pre94XTask)
 
 

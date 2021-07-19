@@ -51,14 +51,15 @@ from Configuration.Eras.Modifier_run2_nanoAOD_102Xv1_cff import run2_nanoAOD_102
 from Configuration.Eras.Modifier_run2_nanoAOD_106Xv1_cff import run2_nanoAOD_106Xv1
 (run2_nanoAOD_92X | run2_nanoAOD_94XMiniAODv1 | run2_nanoAOD_94XMiniAODv2 | run2_nanoAOD_94X2016 | run2_nanoAOD_102Xv1 | run2_nanoAOD_106Xv1).toModify(nanoDQM.vplots.Tau, plots = _tauPlotsPreV9)
 
-_METFixEE2017_DQMentry = nanoDQM.vplots.MET.clone()
-_METFixEE2017_plots = cms.VPSet()
-for plot in _METFixEE2017_DQMentry.plots:
-    if plot.name.value().find("fiducial")>-1: continue
-    _METFixEE2017_plots.append(plot)
-_METFixEE2017_DQMentry.plots = _METFixEE2017_plots
-for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
-    modifier.toModify(nanoDQM.vplots, METFixEE2017 = _METFixEE2017_DQMentry)
+#TEMPORARY
+#_METFixEE2017_DQMentry = nanoDQM.vplots.MET.clone()
+#_METFixEE2017_plots = cms.VPSet()
+#for plot in _METFixEE2017_DQMentry.plots:
+#    if plot.name.value().find("fiducial")>-1: continue
+#    _METFixEE2017_plots.append(plot)
+#_METFixEE2017_DQMentry.plots = _METFixEE2017_plots
+#for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
+#    modifier.toModify(nanoDQM.vplots, METFixEE2017 = _METFixEE2017_DQMentry)
 
 _Electron_plots_2016 = copy.deepcopy(nanoDQM.vplots.Electron.plots)
 _Electron_plots_2016.append(Plot1D('cutBased_HLTPreSel', 'cutBased_HLTPreSel', 2, -0.5, 1.5, 'cut-based HLT pre-selection ID'))
@@ -105,9 +106,11 @@ run2_miniAOD_80XLegacy.toModify(nanoDQM.vplots.Flag, plots = _Flag_plots_80x)
 
 run2_miniAOD_80XLegacy.toModify(nanoDQM.vplots, IsoTrack = None)
 
+(~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(nanoDQM.vplots, Electron = None)
+
 ## MC
 nanoDQMMC = nanoDQM.clone()
-nanoDQMMC.vplots.Electron.sels.Prompt = cms.string("genPartFlav == 1")
+#nanoDQMMC.vplots.Electron.sels.Prompt = cms.string("genPartFlav == 1")
 nanoDQMMC.vplots.LowPtElectron.sels.Prompt = cms.string("genPartFlav == 1")
 nanoDQMMC.vplots.Muon.sels.Prompt = cms.string("genPartFlav == 1")
 nanoDQMMC.vplots.Photon.sels.Prompt = cms.string("genPartFlav == 1")

@@ -39,7 +39,6 @@ svCandidateTable.variables.phi.precision=12
 
 
 #before cross linking
-vertexSequence = cms.Sequence()
+vertexTask = cms.Task()
 #after cross linkining
-vertexTables = cms.Sequence( vertexTable+svCandidateTable)
-
+vertexTablesTask = cms.Task( vertexTable,svCandidateTable )
