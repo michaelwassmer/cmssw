@@ -180,7 +180,7 @@ def nanoAOD_rebuildPuppiMETs(process,isData):
         process.patJetsPuppi.addGenJetMatch = cms.bool(False)
 
     runMetCorAndUncFromMiniAOD(process,isData=isData,metType="Puppi",postfix="Puppi",jetFlavor="AK4PFPuppi", recoMetFromPFCs=bool(nanoAOD_PuppiV15_switch.recoMetFromPFCs), reclusterJets=bool(nanoAOD_PuppiV15_switch.reclusterJets))
-    process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(process.jetTask),cms.Sequence(process.puppiMETSequence+process.fullPatMetSequencePuppi))
+    #process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(process.jetTask),cms.Sequence(process.puppiMETSequence+process.fullPatMetSequencePuppi))
 
     return process
 
@@ -194,7 +194,7 @@ def nanoAOD_addDeepMET(process, addDeepMETProducer, ResponseTune_Graph):
         process.deepMETsResponseTune = process.deepMETProducer.clone()
         #process.deepMETsResponseTune.graph_path = 'RecoMET/METPUSubtraction/data/deepmet/deepmet_resp_v1_2018.pb'
         process.deepMETsResponseTune.graph_path = ResponseTune_Graph.value()
-    process.metTables += process.deepMetTables
+    process.metTablesTask.add(process.deepMetTables)
     return process
 
 
@@ -227,7 +227,7 @@ from PhysicsTools.PatAlgos.slimming.puppiForMET_cff import makePuppiesFromMiniAO
 
 def nanoAOD_recalibrateMETs(process,isData):
     runMetCorAndUncFromMiniAOD(process,isData=isData)
-    process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(process.jetSequence),cms.Sequence(process.fullPatMetSequence))
+    #process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(process.jetSequence),cms.Sequence(process.fullPatMetSequence))
 
     process.basicJetsForMetForT1METNano = process.basicJetsForMet.clone(
         src = process.updatedJetsWithUserData.src,
@@ -235,13 +235,14 @@ def nanoAOD_recalibrateMETs(process,isData):
         type1JetPtThreshold = 0.0,
         calcMuonSubtrRawPtAsValueMap = cms.bool(True),
     )
-    process.jetSequence.insert(process.jetSequence.index(process.updatedJetsWithUserData),cms.Sequence(process.basicJetsForMetForT1METNano))
+    process.metTablesTask.add(process.basicJetsForMetForT1METNano)
+    #process.jetSequence.insert(process.jetSequence.index(process.updatedJetsWithUserData),cms.Sequence(process.basicJetsForMetForT1METNano))
     process.updatedJetsWithUserData.userFloats.muonSubtrRawPt = cms.InputTag("basicJetsForMetForT1METNano:MuonSubtrRawPt")
     process.corrT1METJetTable.src = process.finalJets.src
     process.corrT1METJetTable.cut = "pt<15 && abs(eta)<9.9"
     for table in process.jetTable, process.corrT1METJetTable:
         table.variables.muonSubtrFactor = Var("1-userFloat('muonSubtrRawPt')/(pt()*jecFactor('Uncorrected'))",float,doc="1-(muon-subtracted raw pt)/(raw pt)",precision=6)
-    process.metTables += process.corrT1METJetTable
+    process.metTablesTask.add(process.corrT1METJetTable)
 
     return process
 
@@ -321,15 +322,15 @@ def nanoAOD_runMETfixEE2017(process,isData):
                                fixEE2017 = True,
                                fixEE2017Params = {'userawPt': True, 'ptThreshold':50.0, 'minEtaThreshold':2.65, 'maxEtaThreshold': 3.139},
                                postfix = "FixEE2017")
-    process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(jetSequence),process.fullPatMetSequenceFixEE2017)
+    #process.nanoSequenceCommon.insert(process.nanoSequenceCommon.index(jetSequence),process.fullPatMetSequenceFixEE2017)
 
 def nanoAOD_customizeCommon(process):
 
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: makePuppiesFromMiniAOD(process,True))
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process.puppiNoLep,useExistingWeights = True)
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process.puppi,useExistingWeights = True)
-#    run2_nanoAOD_106Xv1.toModify(process.puppiNoLep, useExistingWeights = False)
-#    run2_nanoAOD_106Xv1.toModify(process.puppi, useExistingWeights = False)
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: makePuppiesFromMiniAOD(process,True))
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process.puppiNoLep,useExistingWeights = True)
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process.puppi,useExistingWeights = True)
+    run2_nanoAOD_106Xv1.toModify(process.puppiNoLep, useExistingWeights = False)
+    run2_nanoAOD_106Xv1.toModify(process.puppi, useExistingWeights = False)
 
 #    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p : nanoAOD_activateVID(p))
     nanoAOD_addDeepInfo_switch = cms.PSet(
@@ -392,20 +393,20 @@ def nanoAOD_customizeCommon(process):
 
 def nanoAOD_customizeData(process):
     process = nanoAOD_customizeCommon(process)
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_recalibrateMETs(process,isData=True))
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_recalibrateMETs(process,isData=True))
 #    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_seqDeepMETs(process,isData=True))
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_rebuildPuppiMETs(process,isData=True))
-#    for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
-#        modifier.toModify(process, lambda p: nanoAOD_runMETfixEE2017(p,isData=True))
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_rebuildPuppiMETs(process,isData=True))
+    for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
+        modifier.toModify(process, lambda p: nanoAOD_runMETfixEE2017(p,isData=True))
     return process
 
 def nanoAOD_customizeMC(process):
     process = nanoAOD_customizeCommon(process)
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_recalibrateMETs(process,isData=False))
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_recalibrateMETs(process,isData=False))
 #    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_seqDeepMETs(process,isData=False))
-#    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_rebuildPuppiMETs(process,isData=False))
-#    for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
-#        modifier.toModify(process, lambda p: nanoAOD_runMETfixEE2017(p,isData=False))
+    (~run3_nanoAOD_devel | run3_nanoAOD_devel).toModify(process, lambda p: nanoAOD_rebuildPuppiMETs(process,isData=False))
+    for modifier in run2_nanoAOD_94XMiniAODv1, run2_nanoAOD_94XMiniAODv2:
+        modifier.toModify(process, lambda p: nanoAOD_runMETfixEE2017(p,isData=False))
     return process
 
 ###increasing the precision of selected GenParticles.                                                                                                 
